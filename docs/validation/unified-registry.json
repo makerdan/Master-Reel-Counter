@@ -299863,6 +299863,287 @@
             "approvalHash": "b7be5a715c4a3df5340c52f6f63e3b6ea6544d9fce42a9131105afa06b72d09e"
           },
           "digest": "c5fdee4910e0fe12e3602d20a23dee7357a4ed2dbefd6585e3833f694caea684"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-25T19:45:23.667Z",
+          "previous": "c5fdee4910e0fe12e3602d20a23dee7357a4ed2dbefd6585e3833f694caea684",
+          "state": {
+            "id": "9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c",
+            "createdAt": "2026-10-25T19:42:30.245Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-fast",
+            "pin": "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b",
+            "planPath": ".local/tasks/9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c.md",
+            "specHash": "1d6ddf21556740b1a488ca438d1bb5650c848c6f1f824fd54871fc90b1ccfdcd",
+            "runs": [
+              {
+                "id": "d8963a97-00cc-47e4-8fe8-22064e72a246",
+                "taskId": "9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b",
+                "tier": "test-fast",
+                "planHash": "13c024b9d6c5b71d05b13f06a55f14234f8b1b90f51acf5648f2b725d508ad53",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "3b2530d1eb0b4c47d511ec4af269157487281706",
+                  "filesHash": "bee865aaf2bf6296adfe1e8c44f19d8b35ab85eea51be1e34c867a01721c2b0a"
+                },
+                "startedAt": "2026-10-25T19:45:23.645Z",
+                "cleanupDeadline": "2026-10-25T19:48:26.647Z",
+                "evidencePath": ".local/failure-gate-unified/runs/d8963a97-00cc-47e4-8fe8-22064e72a246.jsonl",
+                "observations": [],
+                "reportingContext": {
+                  "runtime": {
+                    "node": "20.20.0",
+                    "platform": "linux",
+                    "arch": "x64",
+                    "osReleaseHash": "a6b296572028c57d95384cdb959ae8591deff94b12bc4840647aff43ca55fbc6",
+                    "dependencyLock": "8912c3757224466cc294b573ea4347a44d8008e35d5741911ca5435ba157ec6e",
+                    "implementation": "cc1721d601fda42cb17be538d3eefde9122c2dc2b762dfecf9eb079282dee890"
+                  },
+                  "dirty": false,
+                  "steps": [
+                    {
+                      "key": "26f3bcbc850934e4bf7fc57e8f09314d7335d81b30f6221aee76db6f54567be2",
+                      "label": "typecheck",
+                      "kind": "typecheck"
+                    },
+                    {
+                      "key": "4e6d944e7fe5744cd443b2f6f8d8bc4a22386f7b40bcad818ba846a3669c13b1",
+                      "label": "storage-lint",
+                      "kind": "lint"
+                    },
+                    {
+                      "key": "87c93c1725db927139241123a1f6e47113c8419d3a3ac9d3cd6c2d1632bacad0",
+                      "label": "storage-lint-contract",
+                      "kind": "test"
+                    }
+                  ],
+                  "omittedSteps": 0
+                }
+              }
+            ],
+            "claim": "original-workspace-github-sync-repair-2026-10-25",
+            "spec": {
+              "title": "Restore original workspace GitHub sync",
+              "scope": "Owner-authorized direct execution of the attached archived native task 1023 scope in the original workspace. Preserve local and remote commits; configure origin to https://github.com/makerdan/Master-Reel-Counter and main upstream; retain internal remotes. Review and merge divergent documentation only, preserving incoming superseded documents as historical archive rather than reintroducing obsolete instructions. Verify commit mechanics on an isolated temporary worktree and perform normal pull/push without force, reset, hook bypass or history rewriting. No application, deployment, CI workflow/settings or unrelated changes.",
+              "tier": "test-fast",
+              "why": "Documentation and local Git metadata only: the smallest registered tier provides compiler and storage-contract safety checks. Repository-specific ancestry, tracking, unchanged-application-tree and live Git operations are verified separately; no tier alone proves remote permission.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, lint-storage, storage-lint-contract. Additional authorized bounded Git checks verify both parent ancestry, identical application trees, origin/upstream, isolated commit mechanics, pull/push outcomes and remote/local tip equality.",
+              "approval": {
+                "reference": "Current owner request with attached Restore GitHub Repository Sync task and affirmative Run the attached repair directly here answer",
+                "direction": "Run the attached repair directly in this original workspace.",
+                "applicability": "Non-destructive Git metadata repair and documentation reconciliation only; no new native task or isolated executor."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 preserve both histories and application code",
+                  "check": "Verify both original tips remain ancestors; compare application and test trees against original local HEAD."
+                },
+                {
+                  "requirement": "R2 restore intended synchronization",
+                  "check": "Verify origin URL, main upstream, isolated commit success with existing hooks, normal pull/push and equality of local and advertised GitHub main tips."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "excluded",
+                "material": false,
+                "rationale": "One-time workspace Git configuration and reconciliation of documentation, not a change to application synchronization, executable behavior or automated Git tooling. Live repository assertions still required.",
+                "category": "internal"
+              },
+              "regressionGuard": null
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Restore original workspace GitHub sync\n\n## Task identity\n**Task ID:** 9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c\n**Revision:** 1\n**Skill pin:** 5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b\n\n## Scope\nOwner-authorized direct execution of the attached archived native task 1023 scope in the original workspace. Preserve local and remote commits; configure origin to https://github.com/makerdan/Master-Reel-Counter and main upstream; retain internal remotes. Review and merge divergent documentation only, preserving incoming superseded documents as historical archive rather than reintroducing obsolete instructions. Verify commit mechanics on an isolated temporary worktree and perform normal pull/push without force, reset, hook bypass or history rewriting. No application, deployment, CI workflow/settings or unrelated changes.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** excluded\n**Material scope:** false\n**Rationale:** One-time workspace Git configuration and reconciliation of documentation, not a change to application synchronization, executable behavior or automated Git tooling. Live repository assertions still required.\n\n## Approval evidence\n**Reference:** Current owner request with attached Restore GitHub Repository Sync task and affirmative Run the attached repair directly here answer\n**Owner direction:** Run the attached repair directly in this original workspace.\n**Applicability:** Non-destructive Git metadata repair and documentation reconciliation only; no new native task or isolated executor.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Documentation and local Git metadata only: the smallest registered tier provides compiler and storage-contract safety checks. Repository-specific ancestry, tracking, unchanged-application-tree and live Git operations are verified separately; no tier alone proves remote permission.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, lint-storage, storage-lint-contract. Additional authorized bounded Git checks verify both parent ancestry, identical application trees, origin/upstream, isolated commit mechanics, pull/push outcomes and remote/local tip equality.; supported invocation: TASK_ID=9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c TASK_PLAN_FILE=.local/tasks/9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c.md npm run gate:run -- --id 9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 preserve both histories and application code — Verify both original tips remain ancestors; compare application and test trees against original local HEAD.\n- R2 restore intended synchronization — Verify origin URL, main upstream, isolated commit success with existing hooks, normal pull/push and equality of local and advertised GitHub main tips.\n",
+            "planHash": "13c024b9d6c5b71d05b13f06a55f14234f8b1b90f51acf5648f2b725d508ad53",
+            "approvalHash": "b7be5a715c4a3df5340c52f6f63e3b6ea6544d9fce42a9131105afa06b72d09e"
+          },
+          "digest": "5501961839a38fb006cc05c62885cdd4350afb4fed4cfff4406d297476a1f543"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-25T19:46:12.537Z",
+          "previous": "5501961839a38fb006cc05c62885cdd4350afb4fed4cfff4406d297476a1f543",
+          "state": {
+            "id": "9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c",
+            "createdAt": "2026-10-25T19:42:30.245Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-fast",
+            "pin": "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b",
+            "planPath": ".local/tasks/9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c.md",
+            "specHash": "1d6ddf21556740b1a488ca438d1bb5650c848c6f1f824fd54871fc90b1ccfdcd",
+            "runs": [
+              {
+                "id": "d8963a97-00cc-47e4-8fe8-22064e72a246",
+                "taskId": "9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b",
+                "tier": "test-fast",
+                "planHash": "13c024b9d6c5b71d05b13f06a55f14234f8b1b90f51acf5648f2b725d508ad53",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "3b2530d1eb0b4c47d511ec4af269157487281706",
+                  "filesHash": "bee865aaf2bf6296adfe1e8c44f19d8b35ab85eea51be1e34c867a01721c2b0a"
+                },
+                "startedAt": "2026-10-25T19:45:23.645Z",
+                "cleanupDeadline": "2026-10-25T19:48:26.647Z",
+                "evidencePath": ".local/failure-gate-unified/runs/d8963a97-00cc-47e4-8fe8-22064e72a246.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 27829,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2822,
+                    "outputHash": "9b6f5dab075831bb80a4439c932b5b5d3fd3e551fed38e04be5bccde94d6a0c9",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 334.044545\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 2.670828\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 1.468932\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.923062\n  ...\n# Subtest: transitive guarded retries keep the shared compiler boundary without hiding config discovery\nok 5 - transitive guarded retries keep the shared compiler boundary without hiding config discovery\n  ---\n  duration_ms: 9.180223\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 6 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 1.207348\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 7 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 4.549216\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 8 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.395671\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 9 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 3.447914\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 10 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 5.167227\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 11 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.744733\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 12 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.303732\n  ...\n1..12\n# tests 12\n# suites 0\n# pass 12\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 516.515666\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1330,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 5927,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3111,
+                    "outputHash": "4c62afea77cc2066f3011d2ac776c1bbe96504e24d905d6e31dbb87b2a4f276f",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 605.007509\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 629.973804\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 552.633637\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 696.14934\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 548.705146\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 518.270065\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 905.301897\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 574.286748\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 2.991145\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.730371\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.96316\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 1.382332\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.59358\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.51739\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.764006\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.951112\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 5684.80603\n",
+                    "result": "PASS"
+                  }
+                ],
+                "reportingContext": {
+                  "runtime": {
+                    "node": "20.20.0",
+                    "platform": "linux",
+                    "arch": "x64",
+                    "osReleaseHash": "a6b296572028c57d95384cdb959ae8591deff94b12bc4840647aff43ca55fbc6",
+                    "dependencyLock": "8912c3757224466cc294b573ea4347a44d8008e35d5741911ca5435ba157ec6e",
+                    "implementation": "cc1721d601fda42cb17be538d3eefde9122c2dc2b762dfecf9eb079282dee890"
+                  },
+                  "dirty": false,
+                  "steps": [
+                    {
+                      "key": "26f3bcbc850934e4bf7fc57e8f09314d7335d81b30f6221aee76db6f54567be2",
+                      "label": "typecheck",
+                      "kind": "typecheck"
+                    },
+                    {
+                      "key": "4e6d944e7fe5744cd443b2f6f8d8bc4a22386f7b40bcad818ba846a3669c13b1",
+                      "label": "storage-lint",
+                      "kind": "lint"
+                    },
+                    {
+                      "key": "87c93c1725db927139241123a1f6e47113c8419d3a3ac9d3cd6c2d1632bacad0",
+                      "label": "storage-lint-contract",
+                      "kind": "test"
+                    }
+                  ],
+                  "omittedSteps": 0
+                },
+                "notReached": [],
+                "targetAfter": {
+                  "head": "3b2530d1eb0b4c47d511ec4af269157487281706",
+                  "filesHash": "bee865aaf2bf6296adfe1e8c44f19d8b35ab85eea51be1e34c867a01721c2b0a"
+                },
+                "finishedAt": "2026-10-25T19:46:12.537Z",
+                "interrupted": false
+              }
+            ],
+            "claim": "original-workspace-github-sync-repair-2026-10-25",
+            "spec": {
+              "title": "Restore original workspace GitHub sync",
+              "scope": "Owner-authorized direct execution of the attached archived native task 1023 scope in the original workspace. Preserve local and remote commits; configure origin to https://github.com/makerdan/Master-Reel-Counter and main upstream; retain internal remotes. Review and merge divergent documentation only, preserving incoming superseded documents as historical archive rather than reintroducing obsolete instructions. Verify commit mechanics on an isolated temporary worktree and perform normal pull/push without force, reset, hook bypass or history rewriting. No application, deployment, CI workflow/settings or unrelated changes.",
+              "tier": "test-fast",
+              "why": "Documentation and local Git metadata only: the smallest registered tier provides compiler and storage-contract safety checks. Repository-specific ancestry, tracking, unchanged-application-tree and live Git operations are verified separately; no tier alone proves remote permission.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, lint-storage, storage-lint-contract. Additional authorized bounded Git checks verify both parent ancestry, identical application trees, origin/upstream, isolated commit mechanics, pull/push outcomes and remote/local tip equality.",
+              "approval": {
+                "reference": "Current owner request with attached Restore GitHub Repository Sync task and affirmative Run the attached repair directly here answer",
+                "direction": "Run the attached repair directly in this original workspace.",
+                "applicability": "Non-destructive Git metadata repair and documentation reconciliation only; no new native task or isolated executor."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 preserve both histories and application code",
+                  "check": "Verify both original tips remain ancestors; compare application and test trees against original local HEAD."
+                },
+                {
+                  "requirement": "R2 restore intended synchronization",
+                  "check": "Verify origin URL, main upstream, isolated commit success with existing hooks, normal pull/push and equality of local and advertised GitHub main tips."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "excluded",
+                "material": false,
+                "rationale": "One-time workspace Git configuration and reconciliation of documentation, not a change to application synchronization, executable behavior or automated Git tooling. Live repository assertions still required.",
+                "category": "internal"
+              },
+              "regressionGuard": null
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Restore original workspace GitHub sync\n\n## Task identity\n**Task ID:** 9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c\n**Revision:** 1\n**Skill pin:** 5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b\n\n## Scope\nOwner-authorized direct execution of the attached archived native task 1023 scope in the original workspace. Preserve local and remote commits; configure origin to https://github.com/makerdan/Master-Reel-Counter and main upstream; retain internal remotes. Review and merge divergent documentation only, preserving incoming superseded documents as historical archive rather than reintroducing obsolete instructions. Verify commit mechanics on an isolated temporary worktree and perform normal pull/push without force, reset, hook bypass or history rewriting. No application, deployment, CI workflow/settings or unrelated changes.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** excluded\n**Material scope:** false\n**Rationale:** One-time workspace Git configuration and reconciliation of documentation, not a change to application synchronization, executable behavior or automated Git tooling. Live repository assertions still required.\n\n## Approval evidence\n**Reference:** Current owner request with attached Restore GitHub Repository Sync task and affirmative Run the attached repair directly here answer\n**Owner direction:** Run the attached repair directly in this original workspace.\n**Applicability:** Non-destructive Git metadata repair and documentation reconciliation only; no new native task or isolated executor.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Documentation and local Git metadata only: the smallest registered tier provides compiler and storage-contract safety checks. Repository-specific ancestry, tracking, unchanged-application-tree and live Git operations are verified separately; no tier alone proves remote permission.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, lint-storage, storage-lint-contract. Additional authorized bounded Git checks verify both parent ancestry, identical application trees, origin/upstream, isolated commit mechanics, pull/push outcomes and remote/local tip equality.; supported invocation: TASK_ID=9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c TASK_PLAN_FILE=.local/tasks/9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c.md npm run gate:run -- --id 9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 preserve both histories and application code — Verify both original tips remain ancestors; compare application and test trees against original local HEAD.\n- R2 restore intended synchronization — Verify origin URL, main upstream, isolated commit success with existing hooks, normal pull/push and equality of local and advertised GitHub main tips.\n",
+            "planHash": "13c024b9d6c5b71d05b13f06a55f14234f8b1b90f51acf5648f2b725d508ad53",
+            "approvalHash": "b7be5a715c4a3df5340c52f6f63e3b6ea6544d9fce42a9131105afa06b72d09e"
+          },
+          "digest": "93c1fb972927dc21fe1e52bea7c4838043c952cd114ac82368c64139a059fb78"
         }
       ]
     }
