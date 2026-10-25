@@ -16,6 +16,8 @@ const readdir = from(archiver, "readdir-glob");
 const minimatch = from(readdir, "minimatch");
 const postcss = from(require, "postcss");
 const tailwind = from(from(require, "@tailwindcss/vite"), "@tailwindcss/node");
+const selectorConsumers = ["tailwindcss", "@tailwindcss/typography", "postcss-nested"]
+  .map(name => from(require, name));
 const consumers = [
   ["vite", "7.3.7", require],
   ["vite", "7.3.7", from(require, "@vitejs/plugin-react")],
@@ -23,6 +25,7 @@ const consumers = [
   ["brace-expansion", "5.0.12", minimatch],
   ["source-map-js", "1.2.2", postcss],
   ["source-map-js", "1.2.2", tailwind],
+  ...selectorConsumers.map(consumer => ["postcss-selector-parser", "7.1.7", consumer]),
 ];
 const sandbox = createRequire(new URL("artifacts/mockup-sandbox/package.json", root));
 // Root-only CI installs do not install the independent artifact. Its lockfile
@@ -38,7 +41,36 @@ const floors = new Map([
   ["brace-expansion", "5.0.12"],
   ["browserslist", "4.28.9"],
   ["follow-redirects", "1.16.1"],
+  ["lodash", "4.18.0"],
+  ["sharp", "0.35.5"],
+  ["multer", "2.4.0"],
+  ["ip-address", "10.7.1"],
+  ["postcss-selector-parser", "7.1.6"],
+  ["baseline-browser-mapping", "2.11.0"],
+  ["@babel/core", "7.29.6"],
 ]);
+const releaseLines = new Map([
+  ["picomatch", { 2: "2.3.2", 3: "3.0.2", 4: "4.0.4" }],
+  ["nanoid", { 3: "3.3.18", 5: "5.1.16" }],
+]);
+
+function assignedPatched(name, version) {
+  if (name === "esbuild") {
+    assert.match(version, /^0\.\d+\.\d+$/, "require a stable esbuild release");
+    const [, minor, patch] = version.split(".").map(Number);
+    // GHSA-g7r4-m6w7-qqqr affects [0.27.3, 0.28.1), not older
+    // esbuild lines still used by the root app and its TypeScript loader.
+    assert.ok(minor < 27 || (minor === 27 && patch < 3) ||
+      (minor === 28 && patch >= 1) || minor > 28,
+    `esbuild ${version} is affected by GHSA-g7r4-m6w7-qqqr`);
+    return;
+  }
+  const minimum = releaseLines.has(name)
+    ? releaseLines.get(name)[version.split(".")[0]]
+    : floors.get(name);
+  assert.ok(minimum, `unsupported ${name} release line: ${version}`);
+  patched(version, minimum);
+}
 
 function patched(version, minimum) {
   assert.match(version, /^\d+\.\d+\.\d+$/, "require a stable release");
@@ -105,21 +137,66 @@ test("version guards reject the previously installed vulnerable versions", () =>
   }
 });
 
+test("assigned advisory guards reject every original active package/version finding", () => {
+  for (const [name, versions] of [
+    ["picomatch", ["2.3.1", "4.0.3"]],
+    ["browserslist", ["4.28.1"]],
+    ["vite", ["7.3.1", "7.3.6"]],
+    ["follow-redirects", ["1.16.0"]],
+    ["brace-expansion", ["5.0.9"]],
+    ["postcss", ["8.5.8"]],
+    ["lodash", ["4.17.23"]],
+    ["sharp", ["0.35.4"]],
+    ["nanoid", ["3.3.11"]],
+    ["multer", ["2.3.0"]],
+    ["ip-address", ["10.7.0"]],
+    ["postcss-selector-parser", ["6.0.10", "6.1.4"]],
+    ["baseline-browser-mapping", ["2.10.9"]],
+    ["@babel/core", ["7.29.0"]],
+    ["esbuild", ["0.27.4", "0.28.0"]],
+  ]) {
+    for (const version of versions) {
+      assert.throws(() => assignedPatched(name, version), undefined, `${name}@${version}`);
+    }
+  }
+  for (const [name, versions] of [
+    ...[...floors].map(([name, minimum]) => [name, [minimum]]),
+    ["picomatch", ["2.3.2", "3.0.2", "4.0.4"]],
+    ["nanoid", ["3.3.18", "5.1.16"]],
+    ["esbuild", ["0.25.12", "0.27.2", "0.28.1", "0.28.2"]],
+  ]) {
+    for (const version of versions) assert.doesNotThrow(() => assignedPatched(name, version));
+  }
+});
+
 for (const base of ["", "artifacts/mockup-sandbox/"]) {
-  test(`${base || "root/"} lockfile and installed copies exclude all assigned vulnerabilities`, () => {
+  test(`${base || "root/"} patched lockfile keeps tarballs portable for clean CI installs`, () => {
+    const lock = JSON.parse(readFileSync(new URL(`${base}package-lock.json`, root), "utf8"));
+    for (const [path, pkg] of Object.entries(lock.packages)) {
+      if (!pkg.resolved) continue;
+      const url = new URL(pkg.resolved);
+      assert.equal(url.protocol, "https:", path);
+      assert.equal(url.hostname, "registry.npmjs.org", path);
+    }
+  });
+
+  test(`${base || "root/"} lockfile and installed copies exclude all active assigned vulnerabilities`, () => {
     const lock = JSON.parse(readFileSync(new URL(`${base}package-lock.json`, root), "utf8"));
     const seen = new Set();
     for (const [path, pkg] of Object.entries(lock.packages)) {
       const name = path.split("node_modules/").at(-1);
-      if (!floors.has(name)) continue;
+      if (!floors.has(name) && !releaseLines.has(name) && name !== "esbuild") continue;
       seen.add(name);
-      patched(pkg.version, floors.get(name));
+      assignedPatched(name, pkg.version);
       if (!base || sandboxInstalled) {
         const installed = JSON.parse(readFileSync(new URL(`${base}${path}/package.json`, root), "utf8"));
         assert.equal(installed.version, pkg.version, `installed/locked mismatch: ${base}${path}`);
       }
     }
-    for (const name of base ? ["vite", "postcss", "source-map-js", "browserslist"] : floors.keys()) {
+    for (const name of base
+      ? ["vite", "postcss", "source-map-js", "browserslist", "picomatch", "nanoid",
+        "lodash", "baseline-browser-mapping", "@babel/core", "esbuild"]
+      : [...floors.keys(), ...releaseLines.keys(), "esbuild"]) {
       assert.ok(seen.has(name), `missing ${name} from ${base || "root/"} lockfile`);
     }
   });
@@ -137,10 +214,59 @@ test("sandbox Vite, CSS and Babel consumers resolve patched dependencies", sandb
     ["source-map-js", css],
     ["source-map-js", node],
     ["browserslist", from(babel, "@babel/helper-compilation-targets")],
+    ["@babel/core", from(sandbox, "@vitejs/plugin-react")],
+    ["picomatch", from(sandbox, "micromatch")],
+    ["picomatch", from(sandbox, "vite")],
+    ["picomatch", from(from(sandbox, "vite"), "tinyglobby")],
+    ["lodash", from(sandbox, "recharts")],
+    ["esbuild", from(sandbox, "vite")],
   ]) {
-    patched(metadata(consumer.resolve(name), name).version, floors.get(name));
+    assignedPatched(name, metadata(consumer.resolve(name), name).version);
   }
 });
+
+test("all selector-parser consumers preserve selectors and bound flat-selector parsing", { timeout: 15_000 }, () => {
+  for (const consumer of selectorConsumers) {
+    boundedFixture(`
+      const assert = require("node:assert/strict");
+      const parser = require(${JSON.stringify(consumer.resolve("postcss-selector-parser"))});
+      const selector = 'article > .reel:is(.active, #selected)[data-label="A B"]::before';
+      assert.equal(parser().processSync(selector), selector);
+      const long = ".a".repeat(100000);
+      const result = parser().astSync(long);
+      assert.equal(result.first.nodes.length, 100000);
+      assert.equal(result.toString(), long);
+      console.log("fixture passed");
+    `);
+  }
+});
+
+for (const [label, consumer] of [
+  ["root glob", from(require, "micromatch")],
+  ["root Vite", from(require, "vite")],
+  ...(sandboxInstalled ? [
+    ["sandbox glob", from(sandbox, "micromatch")],
+    ["sandbox Vite", from(sandbox, "vite")],
+    ["sandbox tinyglobby", from(from(sandbox, "vite"), "tinyglobby")],
+  ] : []),
+]) {
+  test(`${label} picomatch preserves matching and rejects inherited POSIX classes`, { timeout: 15_000 }, () => {
+    boundedFixture(`
+      const assert = require("node:assert/strict");
+      const picomatch = require(${JSON.stringify(consumer.resolve("picomatch"))});
+      assert.equal(picomatch("**/*.tsx")("src/App.tsx"), true);
+      assert.equal(picomatch("**/*.tsx")("src/App.css"), false);
+      assert.equal(picomatch("[[:digit:]].txt")("7.txt"), true);
+      for (const name of ["constructor", "toString", "__proto__"]) {
+        assert.equal(picomatch("[[:" + name + ":]]")("c"), false);
+      }
+      for (const pattern of ["+(a|aa)", "+(+(a))", "*(+(a))"]) {
+        assert.equal(picomatch(pattern)("a".repeat(40) + "!"), false);
+      }
+      console.log("fixture passed");
+    `);
+  });
+}
 
 test("export-resolved brace parser bounds deep nesting, long chains and rewrite work", { timeout: 15_000 }, () => {
   boundedFixture(`
