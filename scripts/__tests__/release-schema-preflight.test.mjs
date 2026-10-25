@@ -21,6 +21,7 @@ import {
   validateSchemaWithDrizzle,
 } from "../validate-schema.mjs";
 import { createOwnedDatabase, dropOwnedDatabase } from "../release-smoke-database.mjs";
+import { reviewedPublicationFixture } from "./fixtures/reviewed-publication-schema.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(import.meta.dirname, "../..");
@@ -79,6 +80,23 @@ const currentColumns = [
   "role",
   "capabilities",
 ];
+
+function readOnlySchemaClient(schema) {
+  const client = fakeClient({
+    columns: schema.schemaState.columns.filter((c) => c.table_name === "users").map((c) => c.column_name),
+    roleValues: schema.roleValues,
+    legacyColumns: schema.legacyObjects.filter((name) => name.includes(".")).map((name) => name.split(".")),
+    sessions: schema.legacyObjects.includes("sessions") ? ["sessions"] : [],
+    schemaColumns: schema.schemaState.columns,
+    indexes: schema.schemaState.indexes,
+  });
+  return {
+    query: (sql) => {
+      assert.match(sql.trimStart(), /^SELECT /, "publication fixture must remain read-only");
+      return client.query(sql);
+    },
+  };
+}
 
 async function writeMigrationFixture(directory, tags, contents = {}) {
   await mkdir(resolve(directory, "meta"), { recursive: true });
@@ -543,6 +561,10 @@ test("release-critical migration SQL executes against an isolated PostgreSQL tar
       `/${owned.databaseName}`,
       process.env.DATABASE_URL,
     ).toString();
+    assertIsolatedReleaseDatabase({
+      releaseDatabaseUrl,
+      publicationDatabaseUrl: process.env.DATABASE_URL,
+    });
     const bootstrap = await execFileAsync(
       "npx",
       [
@@ -567,6 +589,22 @@ test("release-critical migration SQL executes against an isolated PostgreSQL tar
       const schema = await assertReleaseSchema(client);
       assert.deepEqual(schema.missingColumns, []);
       assert.deepEqual(schema.missingRoleValues, []);
+      assert.deepEqual(
+        schema.schemaState.columns.filter((c) =>
+          c.table_name === "folders" && c.column_name === "trashed_from_parent_folder_id"),
+        [{
+          table_name: "folders", column_name: "trashed_from_parent_folder_id",
+          data_type: "integer", udt_name: "int4", is_nullable: "YES", column_default: null,
+        }],
+      );
+      const previousCandidate = structuredClone(schema);
+      previousCandidate.schemaState.columns = previousCandidate.schemaState.columns.filter((c) =>
+        !(c.table_name === "folders" && c.column_name === "trashed_from_parent_folder_id"));
+      assert.equal(
+        releaseSchemaFingerprint(previousCandidate),
+        "ab7c906a008a22f19d2c976cab07f15b57180009ec564e0bc73b007c4d74063c",
+        "the entire previous candidate differs only by the reviewed folder snapshot column",
+      );
       assert.equal(
         releaseSchemaFingerprint(schema),
         REVIEWED_PUBLICATION_TRANSITION.candidateFingerprint,
@@ -576,6 +614,54 @@ test("release-critical migration SQL executes against an isolated PostgreSQL tar
         (await assertPublicationSchema(client, { expectedSchema: schema })).mode,
         "current",
       );
+
+      // Execute 0029 independently without adding it to the auth migration set.
+      await client.query("BEGIN");
+      try {
+        await client.query('ALTER TABLE folders DROP COLUMN trashed_from_parent_folder_id');
+        await client.query(await readFile(resolve(root, "migrations/0029_add_folder_parent_trash_snapshot.sql"), "utf8"));
+        assert.deepEqual(compareReleaseSchema(schema, await readReleaseSchema(client)), []);
+      } finally {
+        await client.query("ROLLBACK");
+      }
+
+      const legacy = reviewedPublicationFixture(schema);
+      assert.equal(legacy.schemaState.columns.length, 212);
+      assert.equal(legacy.schemaState.indexes.length, 65);
+      assert.equal(releaseSchemaFingerprint(legacy), REVIEWED_PUBLICATION_TRANSITION.legacyFingerprint);
+      assert.equal(
+        (await assertPublicationSchema(readOnlySchemaClient(legacy), { expectedSchema: schema })).mode,
+        "reviewed-legacy",
+      );
+      // Negative controls mutate metadata only, never a live endpoint. Each
+      // dimension is tested independently on BOTH sides of the actual pins.
+      const mutations = [
+        (s) => { s.schemaState.columns[0].data_type = "unexpected"; },
+        (s) => { s.schemaState.columns[0].is_nullable = "YES"; },
+        (s) => { s.schemaState.columns[0].column_default = "'unexpected'"; },
+        (s) => { s.schemaState.indexes[0].indexdef += " /* unexpected */"; },
+        (s) => { s.roleValues.push("Unexpected"); },
+        (s) => {
+          s.legacyObjects = s.legacyObjects.includes("sessions")
+            ? s.legacyObjects.filter((name) => name !== "sessions")
+            : ["sessions"];
+        },
+      ];
+      for (const mutate of mutations) {
+        const changedCandidate = structuredClone(schema);
+        mutate(changedCandidate);
+        await assert.rejects(
+          assertPublicationSchema(readOnlySchemaClient(legacy), { expectedSchema: changedCandidate }),
+          (error) => error.classification === "target-drift",
+        );
+        const changedPublication = structuredClone(legacy);
+        mutate(changedPublication);
+        assert.notEqual(releaseSchemaFingerprint(changedPublication), REVIEWED_PUBLICATION_TRANSITION.legacyFingerprint);
+        await assert.rejects(
+          assertPublicationSchema(readOnlySchemaClient(changedPublication), { expectedSchema: schema }),
+          (error) => error.classification === "target-drift",
+        );
+      }
     } finally {
       await client.end();
     }
@@ -584,6 +670,17 @@ test("release-critical migration SQL executes against an isolated PostgreSQL tar
       await dropOwnedDatabase(owned, {
         publicationDatabaseUrl: process.env.DATABASE_URL,
       });
+      const adminUrl = new URL(process.env.DATABASE_URL);
+      adminUrl.pathname = "/postgres";
+      const admin = new Client({ connectionString: adminUrl.toString() });
+      try {
+        await admin.connect();
+        assert.equal((await admin.query(
+          "SELECT datname FROM pg_database WHERE datname = $1", [owned.databaseName],
+        )).rowCount, 0, "the run-owned schema database must be removed");
+      } finally {
+        await admin.end();
+      }
     }
     await rm(directory, { recursive: true, force: true });
   }

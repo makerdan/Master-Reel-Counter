@@ -132,7 +132,9 @@ test("discovers and validates the tracked App Support Ops package recursively", 
 
   const parsed = JSON.parse(evals);
   assert.equal(parsed.skill_name, "app-support-ops");
-  assert.deepEqual(parsed.evals.map(({ id }) => id), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(parsed.evals.map(({ id }) => id), [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+  ]);
   assert.equal(parsed.evals.every(({ expectations }) => expectations.length >= 2), true);
 
   refreshProjection();

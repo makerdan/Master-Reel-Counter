@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import http from "node:http";
 import { createRequire } from "node:module";
@@ -12,7 +13,7 @@ import { createImageUpload, IMAGE_UPLOAD_MAX_BYTES } from "../lib/imageUpload";
 import { createApiErrorHandler } from "../middlewares/apiErrorHandler";
 
 const consumer = createRequire(new URL("../routes.ts", import.meta.url));
-const requirements = { sharp: "0.35.5", multer: "2.4.0" };
+const requirements = { sharp: "0.35.5", multer: "2.5.0" };
 
 function installedVersion(name: string): string {
   let directory = dirname(consumer.resolve(name));
@@ -146,8 +147,22 @@ describe("image dependency security and compatibility", { timeout: 20_000 }, () 
 
   test("version guard rejects the affected releases without installing them", () => {
     assert.throws(() => assertPatched("sharp", "0.35.4", requirements.sharp), /requires >=0.35.5/);
-    assert.throws(() => assertPatched("multer", "2.3.0", requirements.multer), /requires >=2.4.0/);
+    for (const version of ["2.3.0", "2.4.0"]) {
+      assert.throws(() => assertPatched("multer", version, requirements.multer), /requires >=2.5.0/);
+    }
     assert.throws(() => assertPatched("sharp", "0.35.5-rc.1", requirements.sharp), /stable/);
+  });
+
+  test("pending asynchronous fileFilter cannot resume storage after request teardown", () => {
+    // An unhandled parser error in a vulnerable version must fail only this
+    // bounded child, not crash or hang the parent test worker.
+    const result = spawnSync(process.execPath, [
+      new URL("../../scripts/__tests__/fixtures/multer-pending-filter.mjs", import.meta.url).pathname,
+    ], { timeout: 8_000, encoding: "utf8", maxBuffer: 64 * 1024 });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.signal, null);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /pending-filter-teardown:ok/);
   });
 
   test("production memory-storage and byte-limit defaults remain unchanged", () => {

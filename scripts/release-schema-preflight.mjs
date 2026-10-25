@@ -28,10 +28,12 @@ const REVIEWED_MIGRATION_NAMES = [
 // legacy target was read without mutation; the candidate was exported into
 // an owned disposable database and checked with the reviewed migrations.
 // Re-review BOTH sides before updating these values.
+// Review provenance and complete metadata delta:
+// docs/superpowers/specs/2026-09-28-release-schema-transition-design.md
 export const REVIEWED_PUBLICATION_TRANSITION = Object.freeze({
   schemaName: "public",
   legacyFingerprint: "dad8f2e20ffdf33fa056d5e0bb384ea7489b3464e131d4c70e5f5cb949c26764",
-  candidateFingerprint: "ab7c906a008a22f19d2c976cab07f15b57180009ec564e0bc73b007c4d74063c",
+  candidateFingerprint: "a71e8c45bff0a02298b691e89f8968d03a5105afb8259f6e8b8fd0affd22373f",
 });
 
 export class ReleaseSchemaPreflightError extends Error {
