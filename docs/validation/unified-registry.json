@@ -299788,6 +299788,83 @@
           "digest": "ef433ce9a938caf73e406cd4eea01687cbc6e7c8083493df51c82e445427d8c5"
         }
       ]
+    },
+    "9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c": {
+      "history": [
+        {
+          "op": "provision",
+          "at": "2026-10-25T19:42:30.246Z",
+          "previous": null,
+          "state": {
+            "id": "9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c",
+            "createdAt": "2026-10-25T19:42:30.245Z",
+            "status": "reserved",
+            "revision": 0,
+            "tier": "test-fast",
+            "pin": "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b",
+            "planPath": ".local/tasks/9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c.md",
+            "specHash": "1d6ddf21556740b1a488ca438d1bb5650c848c6f1f824fd54871fc90b1ccfdcd",
+            "runs": [],
+            "claim": "original-workspace-github-sync-repair-2026-10-25"
+          },
+          "digest": "a664719f77195b6e7b279d9583ef0882f8b11aafa54bbe64e4fbdb9c1f948a80"
+        },
+        {
+          "op": "amend",
+          "at": "2026-10-25T19:42:42.682Z",
+          "previous": "a664719f77195b6e7b279d9583ef0882f8b11aafa54bbe64e4fbdb9c1f948a80",
+          "state": {
+            "id": "9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c",
+            "createdAt": "2026-10-25T19:42:30.245Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-fast",
+            "pin": "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b",
+            "planPath": ".local/tasks/9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c.md",
+            "specHash": "1d6ddf21556740b1a488ca438d1bb5650c848c6f1f824fd54871fc90b1ccfdcd",
+            "runs": [],
+            "claim": "original-workspace-github-sync-repair-2026-10-25",
+            "spec": {
+              "title": "Restore original workspace GitHub sync",
+              "scope": "Owner-authorized direct execution of the attached archived native task 1023 scope in the original workspace. Preserve local and remote commits; configure origin to https://github.com/makerdan/Master-Reel-Counter and main upstream; retain internal remotes. Review and merge divergent documentation only, preserving incoming superseded documents as historical archive rather than reintroducing obsolete instructions. Verify commit mechanics on an isolated temporary worktree and perform normal pull/push without force, reset, hook bypass or history rewriting. No application, deployment, CI workflow/settings or unrelated changes.",
+              "tier": "test-fast",
+              "why": "Documentation and local Git metadata only: the smallest registered tier provides compiler and storage-contract safety checks. Repository-specific ancestry, tracking, unchanged-application-tree and live Git operations are verified separately; no tier alone proves remote permission.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, lint-storage, storage-lint-contract. Additional authorized bounded Git checks verify both parent ancestry, identical application trees, origin/upstream, isolated commit mechanics, pull/push outcomes and remote/local tip equality.",
+              "approval": {
+                "reference": "Current owner request with attached Restore GitHub Repository Sync task and affirmative Run the attached repair directly here answer",
+                "direction": "Run the attached repair directly in this original workspace.",
+                "applicability": "Non-destructive Git metadata repair and documentation reconciliation only; no new native task or isolated executor."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 preserve both histories and application code",
+                  "check": "Verify both original tips remain ancestors; compare application and test trees against original local HEAD."
+                },
+                {
+                  "requirement": "R2 restore intended synchronization",
+                  "check": "Verify origin URL, main upstream, isolated commit success with existing hooks, normal pull/push and equality of local and advertised GitHub main tips."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "excluded",
+                "material": false,
+                "rationale": "One-time workspace Git configuration and reconciliation of documentation, not a change to application synchronization, executable behavior or automated Git tooling. Live repository assertions still required.",
+                "category": "internal"
+              },
+              "regressionGuard": null
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Restore original workspace GitHub sync\n\n## Task identity\n**Task ID:** 9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c\n**Revision:** 1\n**Skill pin:** 5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b\n\n## Scope\nOwner-authorized direct execution of the attached archived native task 1023 scope in the original workspace. Preserve local and remote commits; configure origin to https://github.com/makerdan/Master-Reel-Counter and main upstream; retain internal remotes. Review and merge divergent documentation only, preserving incoming superseded documents as historical archive rather than reintroducing obsolete instructions. Verify commit mechanics on an isolated temporary worktree and perform normal pull/push without force, reset, hook bypass or history rewriting. No application, deployment, CI workflow/settings or unrelated changes.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** excluded\n**Material scope:** false\n**Rationale:** One-time workspace Git configuration and reconciliation of documentation, not a change to application synchronization, executable behavior or automated Git tooling. Live repository assertions still required.\n\n## Approval evidence\n**Reference:** Current owner request with attached Restore GitHub Repository Sync task and affirmative Run the attached repair directly here answer\n**Owner direction:** Run the attached repair directly in this original workspace.\n**Applicability:** Non-destructive Git metadata repair and documentation reconciliation only; no new native task or isolated executor.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Documentation and local Git metadata only: the smallest registered tier provides compiler and storage-contract safety checks. Repository-specific ancestry, tracking, unchanged-application-tree and live Git operations are verified separately; no tier alone proves remote permission.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, lint-storage, storage-lint-contract. Additional authorized bounded Git checks verify both parent ancestry, identical application trees, origin/upstream, isolated commit mechanics, pull/push outcomes and remote/local tip equality.; supported invocation: TASK_ID=9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c TASK_PLAN_FILE=.local/tasks/9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c.md npm run gate:run -- --id 9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 preserve both histories and application code — Verify both original tips remain ancestors; compare application and test trees against original local HEAD.\n- R2 restore intended synchronization — Verify origin URL, main upstream, isolated commit success with existing hooks, normal pull/push and equality of local and advertised GitHub main tips.\n",
+            "planHash": "13c024b9d6c5b71d05b13f06a55f14234f8b1b90f51acf5648f2b725d508ad53",
+            "approvalHash": "b7be5a715c4a3df5340c52f6f63e3b6ea6544d9fce42a9131105afa06b72d09e"
+          },
+          "digest": "c5fdee4910e0fe12e3602d20a23dee7357a4ed2dbefd6585e3833f694caea684"
+        }
+      ]
     }
   },
   "tombstones": [
@@ -299824,6 +299901,7 @@
     "2b06284f-d4e4-46a0-a304-63af64ee980c",
     "709677d8-6eec-40aa-a662-39a0c30f93dd",
     "43ef035b-95b8-4785-9d16-43e5ccecfc3d",
-    "9fd93339-e86d-4fe6-98b8-91f4c2ed24d9"
+    "9fd93339-e86d-4fe6-98b8-91f4c2ed24d9",
+    "9bd0f3b0-17d6-4a93-b4d9-47f0365fc20c"
   ]
 }
