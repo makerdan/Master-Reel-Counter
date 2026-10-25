@@ -1,6 +1,6 @@
 import 
 {
- test, describe, before, after 
+ test, describe, before, after, beforeEach, afterEach
 }
  from "node:test"
 ;
@@ -18,6 +18,24 @@ import {
 } from "../lib/labelScanResources";
 import { cropPhoto } from "../lib/cropPhoto";
 import { registerSessionAuthorizationTests } from "./session-authorization-cases";
+import { authorizeLabelScanPins } from "../lib/labelScanAuthorization";
+
+test("label scan identifiers reject malformed and duplicate inputs before lookups", async () => {
+  const valid = { pinId: 1, photoId: 2 };
+  for (const requests of [
+    [null], [{}], [{ ...valid, pinId: 1.5 }], [{ ...valid, pinId: -1 }],
+    [{ ...valid, pinId: null }], [{ ...valid, pinId: Number.MAX_SAFE_INTEGER + 1 }],
+    [{ ...valid, photoId: "2" }], [{ ...valid, photoId: 0 }],
+    [valid, valid],
+  ]) {
+    let lookups = 0;
+    await assert.rejects(authorizeLabelScanPins(3, requests,
+      async () => { lookups++; return { photoId: 2 }; },
+      async () => { lookups++; return { sessionId: 3 }; }),
+    (error: unknown) => error instanceof LabelScanResourceError && error.statusCode === 400);
+    assert.equal(lookups, requests.length === 2 ? 1 : 0);
+  }
+});
 
 test("permanent folder deletion promotes descendants in an isolated database", { timeout: 30000 }, async (t) => {
   const schema = `folder_lifecycle_${process.pid}_${randomUUID().replaceAll("-", "")}`;
@@ -395,6 +413,8 @@ import
 ;
 import { eq } from "drizzle-orm";
 import { permanentlyDeleteFolderData, storage } from "../storage.js";
+import { getPoeProvider } from "../providers/poe.js";
+import { objectStorageClient } from "../replit_integrations/object_storage/objectStorageClient.mjs";
 
 import 
 {
@@ -2761,7 +2781,179 @@ async function buildProductionPatchRouteContext(
   }
 }
 
+describe("label scan object authorization — production HTTP and PostgreSQL", () => {
+  let context: PatchRouteTestContext;
+  let localPhoto: databaseSchema.Photo;
+  let otherPhoto: databaseSchema.Photo;
+  let victimPhoto: databaseSchema.Photo;
+  let victimPin: databaseSchema.Pin;
+  let otherPin: databaseSchema.Pin;
+  let victimResult: databaseSchema.ScanResult;
+
+  beforeEach(async () => {
+    // Exercise the real approved User/editor path, not an admin bypass.
+    context = await buildProductionPatchRouteContext(false, true);
+    localPhoto = (await storage.getPhoto(context.photoId))!;
+    [otherPhoto] = await db.insert(databaseSchema.photos).values({
+      sessionId: localPhoto.sessionId, userId: localPhoto.userId,
+      objectStorageKey: "/uploads/scan-other.jpg",
+    }).returning();
+    [otherPin] = await db.insert(databaseSchema.pins).values({
+      photoId: otherPhoto.id, xPercent: 50, yPercent: 50,
+    }).returning();
+    const [victimSession] = await db.insert(databaseSchema.countingSessions).values({
+      userId: `victim-${randomUUID()}`, name: "__scan-victim__",
+    }).returning();
+    [victimPhoto] = await db.insert(databaseSchema.photos).values({
+      sessionId: victimSession.id, userId: victimSession.userId,
+      objectStorageKey: "/uploads/scan-victim.jpg",
+    }).returning();
+    [victimPin] = await db.insert(databaseSchema.pins).values({
+      photoId: victimPhoto.id, xPercent: 50, yPercent: 50,
+    }).returning();
+    [victimResult] = await storage.upsertScanResults([{
+      sessionId: victimPhoto.sessionId, photoId: victimPhoto.id, pinId: victimPin.id,
+      pinLabel: "victim-label", rawText: "victim OCR", readable: true, scannedBy: "victim",
+    }]);
+  });
+  afterEach(async () => { await context?.cleanup(); });
+
+  const request = (endpoint: string, pins: unknown[]) => fetch(`${context.baseUrl}${endpoint}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pins }),
+  });
+  const ownRow = () => ({
+    sessionId: localPhoto.sessionId, photoId: localPhoto.id, pinId: context.pinId,
+    pinLabel: "own-label", rawText: "own OCR", readable: true, scannedBy: "editor",
+  });
+  const assertVictimUnchanged = async () => {
+    assert.deepEqual(await storage.getSessionScanResults(victimPhoto.sessionId), [victimResult]);
+  };
+
+  test("both routes reject forged and malformed IDs before image/provider work", async (t) => {
+    const imageReads = t.mock.method(objectStorageClient, "bucket", () => {
+      throw new Error("Unauthorized scan must not read images");
+    });
+    const provider = t.mock.method(getPoeProvider(), "completeVision", async () => {
+      throw new Error("Unauthorized scan must not call AI");
+    });
+    const valid = { photoId: localPhoto.id, pinId: context.pinId, x: 50, y: 50 };
+    for (const endpoint of [
+      `/api/photos/${localPhoto.id}/analyze-labels`,
+      `/api/sessions/${localPhoto.sessionId}/analyze-labels`,
+    ]) {
+      for (const invalid of [
+        { ...valid, pinId: victimPin.id },
+        { ...valid, pinId: otherPin.id },
+        { ...valid, pinId: 2147483647 },
+        { ...valid, pinId: "1" },
+      ]) {
+        // A valid first item must not be processed before the invalid item.
+        const response = await request(endpoint, [valid, invalid]);
+        assert.equal(response.status, 400, JSON.stringify(invalid));
+        await assertVictimUnchanged();
+      }
+    }
+    // Even a pin that genuinely belongs to the supplied photo is foreign
+    // when that photo belongs to another session.
+    const foreign = await request(`/api/sessions/${localPhoto.sessionId}/analyze-labels`, [{
+      photoId: victimPhoto.id, pinId: victimPin.id, x: 50, y: 50,
+    }]);
+    assert.equal(foreign.status, 400);
+    const missingPhoto = await request(`/api/sessions/${localPhoto.sessionId}/analyze-labels`, [{
+      pinId: context.pinId, x: 50, y: 50,
+    }]);
+    assert.equal(missingPhoto.status, 400);
+    assert.equal(imageReads.mock.callCount(), 0);
+    assert.equal(provider.mock.callCount(), 0);
+    assert.deepEqual(await storage.getSessionScanResults(localPhoto.sessionId), []);
+    await assertVictimUnchanged();
+  });
+
+  test("storage rejects mismatched ownership and rolls back a mixed batch", async () => {
+    for (const invalid of [
+      { ...ownRow(), pinId: victimPin.id },
+      { ...ownRow(), photoId: victimPhoto.id, pinId: victimPin.id },
+      { ...ownRow(), sessionId: victimPhoto.sessionId },
+      { ...ownRow(), pinId: otherPin.id },
+      { ...ownRow(), pinId: 2147483647 },
+    ]) {
+      await assert.rejects(storage.upsertScanResults([ownRow(), invalid]), /ownership mismatch/);
+      assert.deepEqual(await storage.getSessionScanResults(localPhoto.sessionId), []);
+      await assertVictimUnchanged();
+    }
+  });
+
+  test("storage cannot overwrite a conflicting result stored under another scope", async () => {
+    // Model an inconsistent legacy row. Valid current pin ownership must not
+    // grant permission to update an existing foreign-scoped scan result.
+    const [legacy] = await db.insert(databaseSchema.scanResults).values({
+      ...ownRow(), pinId: otherPin.id,
+      sessionId: victimPhoto.sessionId, photoId: victimPhoto.id,
+    }).returning();
+    try {
+      await assert.rejects(storage.upsertScanResults([
+        ownRow(), { ...ownRow(), pinId: otherPin.id, photoId: otherPhoto.id },
+      ]), /ownership mismatch/);
+      assert.deepEqual(await storage.getSessionScanResults(localPhoto.sessionId), []);
+      const [unchanged] = await db.select().from(databaseSchema.scanResults)
+        .where(eq(databaseSchema.scanResults.id, legacy.id));
+      assert.deepEqual(unchanged, legacy);
+    } finally {
+      await db.delete(databaseSchema.scanResults).where(eq(databaseSchema.scanResults.id, legacy.id));
+    }
+    await assertVictimUnchanged();
+  });
+
+  test("storage rechecks pin ownership after a pin moves during analysis", async () => {
+    await db.update(databaseSchema.pins).set({ photoId: otherPhoto.id })
+      .where(eq(databaseSchema.pins.id, context.pinId));
+    try {
+      await assert.rejects(storage.upsertScanResults([ownRow()]), /ownership mismatch/);
+      assert.deepEqual(await storage.getSessionScanResults(localPhoto.sessionId), []);
+    } finally {
+      await db.update(databaseSchema.pins).set({ photoId: localPhoto.id })
+        .where(eq(databaseSchema.pins.id, context.pinId));
+    }
+  });
+
+  test("an approved editor can scan and update authorized pins through both routes", async (t) => {
+    const image = await sharp({ create: {
+      width: 100, height: 100, channels: 3, background: "white",
+    } }).jpeg().toBuffer();
+    const imageReads = t.mock.method(objectStorageClient, "bucket", (() => ({
+      file: () => ({
+        exists: async () => [true],
+        createReadStream: () => Readable.from([image]),
+      }),
+    })) as any);
+    const provider = t.mock.method(getPoeProvider(), "completeVision", (async (args: { expectedLabels: number }) => ({
+      labels: Array.from({ length: args.expectedLabels }, () => "authorized OCR"),
+    })) as any);
+    const valid = { photoId: localPhoto.id, pinId: context.pinId, pinLabel: "own-label", x: 50, y: 50 };
+    // The photo route ignores a client-supplied photoId and uses its own ID.
+    const photoResponse = await request(`/api/photos/${localPhoto.id}/analyze-labels`,
+      [{ ...valid, photoId: victimPhoto.id }]);
+    assert.equal(photoResponse.status, 200, await photoResponse.text());
+    const initial = await storage.getSessionScanResults(localPhoto.sessionId);
+    assert.equal(initial.length, 1);
+    assert.equal(initial[0].rawText, "authorized OCR");
+    const sessionResponse = await request(`/api/sessions/${localPhoto.sessionId}/analyze-labels`, [
+      valid, { ...valid, photoId: otherPhoto.id, pinId: otherPin.id, pinLabel: "other-label" },
+    ]);
+    assert.equal(sessionResponse.status, 200, await sessionResponse.text());
+    const updated = await storage.getSessionScanResults(localPhoto.sessionId);
+    assert.equal(updated.length, 2);
+    assert.equal(updated.find(row => row.pinId === context.pinId)!.id, initial[0].id);
+    assert.ok(updated.every(row => row.rawText === "authorized OCR"));
+    assert.equal(provider.mock.callCount(), 2);
+    assert.equal(imageReads.mock.callCount(), 3);
+    await assertVictimUnchanged();
+  });
+});
+
 registerSessionAuthorizationTests(() => buildProductionPatchRouteContext(false, true));
+
 
 describe("pin entry links — production authorization boundary", () => {
   let context: PatchRouteTestContext;

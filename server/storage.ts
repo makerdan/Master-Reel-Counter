@@ -2554,24 +2554,38 @@ export class DatabaseStorage implements IStorage {
 
   async upsertScanResults(results: InsertScanResult[]): Promise<ScanResult[]> {
     if (!results.length) return [];
-    const inserted: ScanResult[] = [];
-    for (const r of results) {
-      const [row] = await db.insert(scanResults)
-        .values(r)
-        .onConflictDoUpdate({
-          target: scanResults.pinId,
-          set: {
-            rawText: r.rawText,
-            readable: r.readable,
-            pinLabel: r.pinLabel,
-            scannedBy: r.scannedBy,
-            updatedAt: new Date(),
-          },
-        })
-        .returning();
-      inserted.push(row);
-    }
-    return inserted;
+    return db.transaction(async (tx) => {
+      const inserted: ScanResult[] = [];
+      for (const r of results) {
+        // Recheck ownership after the potentially long AI call. Hold both
+        // records stable until commit so a concurrent move/delete cannot
+        // invalidate the relationship between this check and the write.
+        const [scope] = await tx.select({ pinId: pins.id })
+          .from(pins)
+          .innerJoin(photos, eq(pins.photoId, photos.id))
+          .where(and(eq(pins.id, r.pinId), eq(pins.photoId, r.photoId),
+            eq(photos.sessionId, r.sessionId)))
+          .for("share");
+        if (!scope) throw new Error("Scan result ownership mismatch");
+        const [row] = await tx.insert(scanResults)
+          .values(r)
+          .onConflictDoUpdate({
+            target: scanResults.pinId,
+            setWhere: and(eq(scanResults.photoId, r.photoId), eq(scanResults.sessionId, r.sessionId)),
+            set: {
+              rawText: r.rawText,
+              readable: r.readable,
+              pinLabel: r.pinLabel,
+              scannedBy: r.scannedBy,
+              updatedAt: new Date(),
+            },
+          })
+          .returning();
+        if (!row) throw new Error("Scan result ownership mismatch");
+        inserted.push(row);
+      }
+      return inserted;
+    });
   }
 
   async getSessionScanResults(sessionId: number): Promise<ScanResult[]> {

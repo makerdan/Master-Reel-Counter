@@ -1,0 +1,28 @@
+{
+  "claim": "label-scan-object-authorization",
+  "title": "Enforce label scan pin, photo and session ownership",
+  "scope": "Repair the assigned label scan BOLA in both production analyze-labels routes and upsertScanResults. Reject missing, malformed or mismatched pin/photo/session identifiers before image/provider work; protect persistence against mismatched ownership and foreign conflict rows, atomically. Preserve valid scanning, collaborator access, provider and UI flows. No schema changes.",
+  "tier": "test-standard",
+  "why": "The backend authorization repair needs compiler checks, executable production-route regressions and real PostgreSQL persistence coverage.",
+  "coverage": "docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts, where HTTP and isolated PostgreSQL regression cases run.",
+  "approval": {
+    "reference": "Assigned task 1012 in the active conversation",
+    "direction": "Patch cross-session label scan result overwrites without new product flows",
+    "applicability": "Route and persistence security hardening and regression coverage are within assigned scope; independent verification not selected"
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {"requirement": "R1 request ownership", "check": "Both production routes reject forged foreign, wrong-photo, missing and malformed pin IDs before provider work and leave victim results unchanged."},
+    {"requirement": "R2 persistence isolation", "check": "The production storage method rejects mismatched pin/photo/session relationships and foreign conflict rows without changing any rows in a mixed batch."},
+    {"requirement": "R3 valid scans", "check": "Valid same-scope inserts and updates succeed; valid editor access remains accepted."}
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Fixes a persistent cross-session data-integrity and object-authorization vulnerability.",
+    "covers": "R1 client-controlled pin IDs in both endpoints; R2 database insert and conflict update isolation plus atomic batch rollback; R3 authorized scanning compatibility",
+    "testLocation": "server/__tests__/routes.test.ts — label scan object authorization HTTP and PostgreSQL cases",
+    "assertion": "Send forged pin IDs through actual production routes and assert rejection and unchanged victim data; call actual storage with invalid ownership and foreign conflicts and assert rejection plus batch rollback; assert normal inserts and updates succeed."
+  }
+}

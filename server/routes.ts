@@ -33,6 +33,7 @@ import { registerImageRoutes } from "./replit_integrations/image";
 import { z } from "zod";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "./db";
+import { authorizeLabelScanPins } from "./lib/labelScanAuthorization";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry, UNREADABLE_SENTINEL } from "./encryption";
 import { createImageUpload } from "./lib/imageUpload";
 import PDFDocument from "pdfkit";
@@ -2784,10 +2785,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: `Too many pins: maximum ${MAX_PINS_PER_CROP_REQUEST} per request.` });
       }
 
+      const scanPins = pinData.map((pin: any) => ({ ...pin, photoId }));
+      await authorizeLabelScanPins(photo.sessionId, scanPins,
+        (id) => storage.getPin(id), (id) => storage.getPhoto(id));
       releaseScan = acquireLabelScanSlot();
       const prepared = await prepareLabelScan(
         photo.sessionId,
-        pinData.map((pin: any) => ({ ...pin, photoId })),
+        scanPins,
         async () => photo,
         loadPhotoBuffer,
       );
@@ -2903,6 +2907,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: `Too many pins: maximum ${MAX_PINS_PER_CROP_REQUEST} per request.` });
       }
 
+      await authorizeLabelScanPins(sessionId, pinData,
+        (id) => storage.getPin(id), (id) => storage.getPhoto(id));
       releaseScan = acquireLabelScanSlot();
       const prepared = await prepareLabelScan(sessionId, pinData, (id) => storage.getPhoto(id), loadPhotoBuffer);
       const allCropRequests = prepared.requests;
@@ -2963,10 +2969,10 @@ export async function registerRoutes(
 
       try {
         const scanResultRows = allResults.map((r) => {
-          const pinEntry = pinData.find((p: any) => p.pinId === r.pinId);
+          const pinEntry = allCropRequests.find((p) => p.pinId === r.pinId)!;
           return {
             sessionId,
-            photoId: pinEntry?.photoId ?? 0,
+            photoId: pinEntry.photoId,
             pinId: r.pinId,
             pinLabel: r.pinLabel,
             rawText: r.rawText,
