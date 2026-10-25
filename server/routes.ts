@@ -783,15 +783,15 @@ export const patchEntrySchema = z.object({
   section: z.string().optional(),
   position: z.string().nullable().optional(),
   palletId: z.string().nullable().optional(),
-  reelTag: z.string().optional(),
-  wireType: z.string().optional(),
-  gauge: z.string().optional(),
+  reelTag: z.string().nullable().optional(),
+  wireType: z.string().nullable().optional(),
+  gauge: z.string().nullable().optional(),
   footage: z.number().nullable().optional(),
   reelCount: z.number().nullable().optional(),
   color: z.string().nullable().optional(),
   manufacturer: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  conductors: z.number().nullable().optional(),
+  conductors: z.string().nullable().optional(),
   photoId: z.number().nullable().optional(),
   serverUpdatedAt: z.union([z.string(), z.number()]).optional(),
 });
@@ -2257,6 +2257,9 @@ export async function registerRoutes(
         (error as any)?.constraint === "pins_photo_label_unique"
       ) {
         return res.status(409).json({ message: "A pin with that label already exists on this photo" });
+      }
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid entry data", errors: error.flatten().fieldErrors });
       }
       console.error("Error creating entry:", error);
       res.status(500).json({ message: "Failed to create entry" });

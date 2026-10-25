@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, mkdtempSync, copyFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -86,6 +87,7 @@ const sandboxOptions = {
   skip: sandboxInstalled ? false : "sandbox not installed; both lockfile guards still run",
 };
 const floors = new Map([
+  ["zod", "4.6.6"],
   ["vite", "7.3.7"],
   ["postcss", "8.5.28"],
   ["source-map-js", "1.2.2"],
@@ -100,10 +102,73 @@ const floors = new Map([
   ["baseline-browser-mapping", "2.11.0"],
   ["@babel/core", "7.29.6"],
 ]);
+test("Zod consumers use patched compatible adapters and bound oversized collections", () => {
+  const contexts = [require, ...["drizzle-zod", "openai", "zod-validation-error", "@hookform/resolvers"]
+    .map(name => from(require, name))];
+  if (sandboxInstalled) contexts.push(sandbox, from(sandbox, "@hookform/resolvers"));
+  for (const consumer of contexts) {
+    patched(metadata(consumer.resolve("zod"), "zod").version, "4.6.6");
+  }
+  patched(metadata(require.resolve("drizzle-zod"), "drizzle-zod").version, "0.8.3");
+  patched(metadata(require.resolve("@hookform/resolvers"), "@hookform/resolvers").version, "5.2.2");
+  patched(metadata(require.resolve("zod-validation-error"), "zod-validation-error").version, "5.0.0");
+  assert.throws(() => patched("3.25.76", "4.6.6"));
+  assert.throws(() => patched("4.6.5", "4.6.6"));
+  for (const consumer of [require, ...(sandboxInstalled ? [sandbox] : [])]) {
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(process.execPath, ["--max-old-space-size=64", "--input-type=commonjs", "-e", `
+      const assert = require("node:assert/strict");
+      const { z } = require(${JSON.stringify(consumer.resolve("zod"))});
+      const schema = z.array(z.string()).max(10);
+      assert.deepEqual(schema.parse(["one", "two"]), ["one", "two"]);
+      const result = schema.safeParse(Array(1000000).fill(123));
+      assert.equal(result.success, false);
+      assert.equal(result.error.issues.length, 1);
+      assert.equal(result.error.issues[0].code, "too_big");
+      console.log("bounded collection passed");
+    `], { env, encoding: "utf8", timeout: 10000, killSignal: "SIGKILL", maxBuffer: 16384 });
+    assert.ifError(result.error);
+    assert.equal(result.signal, null, result.stderr);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), "bounded collection passed");
+  }
+});
 const releaseLines = new Map([
   ["picomatch", { 2: "2.3.2", 3: "3.0.2", 4: "4.0.4" }],
   ["nanoid", { 3: "3.3.18", 5: "5.1.16" }],
 ]);
+
+test("portable locked installs retain fixed Zod and compatible adapters", { timeout: 190000 }, async () => {
+  const directory = mkdtempSync(join(tmpdir(), "zod-locked-install-"));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 180000);
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  try {
+    for (const base of ["", "artifacts/mockup-sandbox/"]) {
+      for (const file of ["package.json", "package-lock.json"]) {
+        copyFileSync(new URL(`${base}${file}`, root), join(directory, file));
+      }
+      let output = "";
+      const result = await runOwnedProcessGroup("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], {
+        cwd: directory, env, signal: controller.signal,
+        terminationGraceMs: 250, terminationWaitMs: 1500,
+        onOutput(chunk) { output = (output + chunk.toString()).slice(-16384); },
+      });
+      assert.equal(result.status, 0, output);
+      assert.equal(result.groupGone, true);
+      const installed = createRequire(join(directory, "package.json"));
+      for (const name of base ? ["@hookform/resolvers"] : ["drizzle-zod", "openai", "zod-validation-error", "@hookform/resolvers"]) {
+        patched(metadata(from(installed, name).resolve("zod"), "zod").version, "4.6.6");
+      }
+      patched(metadata(installed.resolve("zod"), "zod").version, "4.6.6");
+    }
+  } finally {
+    clearTimeout(timer);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 function assignedPatched(name, version) {
   if (name === "esbuild") {

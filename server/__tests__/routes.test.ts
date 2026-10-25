@@ -1879,6 +1879,11 @@ describe("patchPinFlagSchema — Zod body guard", () => {
 });
 
 describe("patchEntrySchema — Zod body guard", () => {
+  test("preserves nullable entry fields and string conductors", () => {
+    const input = { reelTag: null, wireType: null, gauge: null, footage: null, conductors: "3", notes: null };
+    assert.deepEqual(patchEntrySchema.parse(input), input);
+    assert.equal(patchEntrySchema.safeParse({ conductors: 3 }).success, false);
+  });
   test("rejects undefined (missing body)", () => {
     const result = patchEntrySchema.safeParse(undefined);
     assert.equal(result.success, false, "undefined body must fail validation");
@@ -3159,6 +3164,27 @@ describe("Detail-shot references — production session isolation", () => {
       assert.equal(result.status, 400);
     }
     assert.deepEqual(await db.select().from(databaseSchema.entries), entriesBefore);
+  });
+
+  test("Zod migration preserves real entry create/edit and safe invalid-input responses", async () => {
+    const path = `/api/sessions/${localPhoto.sessionId}/entries`;
+    const body = { aisle: "A", section: "1", footage: null, wireType: null, reelTag: null, gauge: null, conductors: "3", notes: null };
+    const created = await httpReq(context.baseUrl, "POST", path, { body });
+    assert.equal(created.status, 200);
+    for (const [key, value] of Object.entries(body)) assert.equal(created.body[key], value);
+    assert.equal(created.body.reelCount, 1, "database default survives adapter migration");
+    const updated = await httpReq(context.baseUrl, "PATCH", `/api/entries/${created.body.id}`, {
+      body: { footage: 250, conductors: "4", wireType: null },
+    });
+    assert.equal(updated.status, 200);
+    assert.equal(updated.body.footage, 250);
+    assert.equal(updated.body.conductors, "4");
+    for (const [method, url] of [["POST", path], ["PATCH", `/api/entries/${created.body.id}`]]) {
+      const invalid = await httpReq(context.baseUrl, method, url, { body: { ...body, footage: "invalid" } });
+      assert.equal(invalid.status, 400);
+      assert.ok(Array.isArray(invalid.body.errors.footage));
+      assert.equal(invalid.body.stack, undefined);
+    }
   });
 
   test("photo PATCH rejects foreign and missing parents without changing either session", async () => {

@@ -1,0 +1,28 @@
+{
+  "claim": "zod-oversized-constrained-collections-security",
+  "title": "Prevent oversized validation inputs from exhausting memory",
+  "scope": "Remove GHSA-mrhx-c7xc-m3w5 from root and mockup sandbox installed and locked graphs by migrating Zod to a fixed version with compatible Drizzle, form resolver and error formatting adapters. Preserve schemas, nullable entry text and footage, string conductors, coercion, defaults, AI output parsing and safe malformed-input HTTP 400 contracts. Verify consumer-relative resolution and portable clean locked installs. No audit waivers, production-data changes or deployment.",
+  "tier": "test-heavy",
+  "why": "Only test-heavy includes security-audit and browser-tests alongside typecheck and unit-tests required for this dependency compatibility repair.",
+  "coverage": "docs/validation/manifest.json test-heavy has a 900000 ms bound; security-audit runs npm audit --audit-level=high, unit-tests includes dependency-tooling-security and routes tests, typecheck includes application and browser types, browser-tests uses scripts/run-browser-tests.mjs.",
+  "approval": {
+    "reference": "Assigned task 1007 in the active conversation",
+    "direction": "Prevent oversized validation inputs from exhausting memory and complete the specified compatibility and regression coverage",
+    "applicability": "Major Zod migration and related adapter updates are explicitly within the assigned scope; independent verification is not selected"
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {"requirement": "R1 fixed dependency graphs", "check": "Root and sandbox locked and actual consumer resolutions use Zod at least 4.6.6 and compatible adapters; portable clean installs retain those resolutions and the exact advisory is absent."},
+    {"requirement": "R2 bounded collection rejection", "check": "A timeout-bounded child with a heap limit rejects an oversized constrained collection deterministically without memory exhaustion; normal valid collections succeed."},
+    {"requirement": "R3 preserved validation behavior", "check": "Real API malformed inputs retain HTTP 400 and safe errors; nullable text and footage, string conductors, coercion and defaults remain accepted; form and AI schemas compile and existing browser entry footage flows pass."}
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Material security and compatibility repair for memory exhaustion in constrained collection validation.",
+    "covers": "GHSA-mrhx-c7xc-m3w5 and migration regressions in collection bounds, schema defaults, nullability, coercion and error formatting",
+    "testLocation": "scripts/__tests__/dependency-tooling-security.test.mjs, server/__tests__/routes.test.ts, tests/entry-footage.spec.ts",
+    "assertion": "Consumer-relative version guards detect vulnerable root or sandbox resolutions; a memory-limited bounded child verifies early rejection and ordinary success; API and browser cases preserve malformed-input 400 responses and valid nullable entry fields and string conductors."
+  }
+}
