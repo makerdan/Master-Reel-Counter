@@ -1,0 +1,36 @@
+{
+  "claim": "clerk-navigation-mobile-diagnosis-997",
+  "title": "Diagnose Clerk navigation and mobile readiness failures",
+  "scope": "Diagnostic execution of assigned task 997 against the current checkout. Separate Clerk bootstrap/challenge handling, session activation, automatic exact Settings navigation, protected Settings rendering and HTTP 200 local authorization. Run the existing real email/password form case using its empty context and disposable approved account; do not replace it with ticket sign-in or forced navigation. Exercise both existing delayed Mobile Flow readiness cases on the supported phone project with unchanged default capture and exact click histories. Preserve original failures and distinguish readiness from the separate known downstream photo filename assertion. Inspect retained safe artifacts without retaining credentials, codes, tokens, cookies, session/user IDs, query-bearing URLs or arbitrary provider payloads. No new instrumentation is included. Before any material production or harness repair, prepare an evidence-supported same-task amendment with concrete responsible-boundary regression coverage through gate:amend, then re-guard; do not implement speculative repairs. No failure reproduction means report not reproduced or blocked, not an invented root cause. Run the complete bound workload and record target, revision, commands, stage-specific results and not-reached checks outside the sealed plan. Out of scope: tenant provisioning/configuration, SDK upgrades, approval bypass, deployment, real-user data changes, baseline exclusions, gate maintenance, independent verification, new delayed reload/error Retry cases owned elsewhere, and photo filename/upload/protected image/WebSocket/reconnect repairs.",
+  "tier": "test-heavy",
+  "why": "Only this registered tier contains the real browser form sign-in and authenticated delayed phone-readiness journeys.",
+  "coverage": "docs/validation/manifest.json tiers.test-heavy browser-tests uses scripts/run-browser-tests.mjs and playwright.config.ts, with compiler, unit and release-schema-contract checks inside a 900000 ms tier budget. Supported gate:run browser-tests diagnostics with existing file/case/pattern selection supplement but never replace the full bound workload; preserve enabled project policy and verify isolated database/server ownership before execution.",
+  "approval": {
+    "reference": "Current assigned task 997 diagnostic stage of the owner's investigate-and-fix request.",
+    "direction": "Establish admitted context, recover and reproduce the failing stage, confirm existing readiness behavior, prepare only evidence-scoped same-task repair amendments if needed, and record actual outcomes without speculative production changes.",
+    "applicability": "Covers diagnostic admission, existing checks, isolated disposable test fixtures and evidence handoff only. Does not authorize gate maintenance, deployment, unrelated photo repairs or unverified behavior changes. No original receipt or independent approval is claimed."
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {
+      "requirement": "R1: Distinguish real-form activation, automatic Settings navigation and local authorization",
+      "check": "tests/clerk-sign-in-navigation.spec.ts case signed-out Settings entry returns to protected Settings after form sign-in: existing empty browser context, real email/password and supported challenge, active Clerk session assertion, exact automatic Settings URL, visible protected title and HTTP 200 from /api/auth/user. Record case, project, stage, exact safely redacted signature, run and target; retain failures even if a retry passes."
+    },
+    {
+      "requirement": "R2: Confirm both delayed phone readiness cases",
+      "check": "tests/mobile-photo-upload.spec.ts waits for delayed session readiness from phone capture and from full mode on mobile-chromium under existing project policy: absent controls while session GET held, resulting capture header, Reel IDs toggle, session name and aisle input; actual toggle histories exactly [] or [Mobile Flow], unchanged by idempotent re-entry. Report setup failures and not-reached assertions separately."
+    },
+    {
+      "requirement": "R3: Evidence-scoped amendment or explicit not-reproduced/blocked outcome",
+      "check": "Record current full-contract identities, admitted identity/revision/plan/workload, source target, exact commands and observations in docs/validation/clerk-navigation-mobile-diagnosis-handoff.md. Prepare a supported same-task repair amendment only for a verified unresolved in-scope defect, with detecting boundary assertions before implementation. Keep downstream filename failure separate and no failure waived by the empty baseline catalog; full heavy result remains distinct from filtered diagnostics."
+    }
+  ],
+  "regression": {
+    "form": "self",
+    "material": false,
+    "rationale": "The entire stage diagnoses and executes existing checks for unchanged behavior. No production, test-helper, instrumentation, validation-harness or project policy change is included; any material repair requires an evidence-supported amendment before implementation.",
+    "testLocation": "tests/clerk-sign-in-navigation.spec.ts signed-out Settings entry returns to protected Settings after form sign-in; tests/mobile-photo-upload.spec.ts both delayed session readiness cases",
+    "assertion": "Real form separately requires an active Clerk session, automatic exact Settings destination, protected Settings title and local user HTTP 200; controlled delayed phone/full-mode cases require capture controls and exact zero/one toggle histories with idempotent re-entry"
+  }
+}

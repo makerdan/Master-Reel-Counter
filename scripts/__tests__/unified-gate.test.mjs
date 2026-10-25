@@ -501,6 +501,29 @@ test("merge guard preserves IDs/tombstones and permits only append-only supporte
   assert.throws(() => mergeGuard(root, readRegistry(root), true), /Git index/);
 });
 
+test("large committed and staged registries preserve admission and history checks", async (t) => {
+  const root = fixture(t), state = await provision(root, spec());
+  const base = readRegistry(root);
+  // Valid JSON whitespace makes the actual Git blob exceed the old fixed
+  // buffer without fabricating events or spending time minting live identities.
+  write(root, "docs/validation/unified-registry.json",
+    JSON.stringify(base) + "\n" + " ".repeat(4_100_000));
+  git(root, ["add", "docs/validation/unified-registry.json"]);
+  mergeGuard(root, base, true);
+  git(root, ["commit", "-qm", "large fixture registry"]);
+  mergeGuard(root, base);
+  const missing = structuredClone(base);
+  delete missing.tasks[state.id];
+  assert.throws(() => mergeGuard(root, missing), /task ID disappeared/);
+  const rewritten = structuredClone(base);
+  rewritten.tasks[state.id].history.at(-1).state.spec.scope = "Changed historical scope";
+  assert.throws(() => mergeGuard(root, rewritten), /changed event chain|history rewritten/);
+  const next = await provision(root, spec());
+  assert.notEqual(next.id, state.id);
+  assert.deepEqual(readRegistry(root).tasks[state.id], base.tasks[state.id]);
+  assert.equal(guard(root, ctx(next)).id, next.id);
+});
+
 test("exact baseline identity, warning-only maintenance and explicit classification logs", async (t) => {
   const root = fixture(t);
   const record = { id: "fixture-baseline", suite: "fixture-suite", test: "fixture test",

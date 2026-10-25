@@ -174,21 +174,31 @@ export function compareRegistry(base, candidate) {
       `committed task history rewritten: ${id}`);
   }
 }
-export function git(root, args, allowedFailure = false) {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 3000, maxBuffer: 4_000_000 });
+export function git(root, args, allowedFailure = false, maxBuffer = 4_000_000) {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 3000, maxBuffer });
   if (!allowedFailure) invariant(result.status === 0, `git prerequisite failed: ${args[0]}`);
   return result;
 }
+function gitRegistry(root, ref) {
+  // Resolve once so sizing and reading use the same immutable Git object, even
+  // if HEAD or the index changes. Retained history can outgrow the generic
+  // command-output buffer; its actual blob size supplies the bounded read.
+  const object = git(root, ["rev-parse", "--verify", `${ref}:${REGISTRY}`]).stdout.trim();
+  const size = Number(git(root, ["cat-file", "-s", object]).stdout.trim());
+  invariant(Number.isSafeInteger(size) && size > 0 && size <= Number.MAX_SAFE_INTEGER - 65536,
+    "invalid registry Git object size");
+  return JSON.parse(git(root, ["show", object], false, Math.max(4_000_000, size + 65536)).stdout);
+}
 function committedRegistry(root, ref) {
   const listing = git(root, ["ls-tree", ref, "--", REGISTRY]).stdout.trim();
-  return listing ? JSON.parse(git(root, ["show", `${ref}:${REGISTRY}`]).stdout) : emptyRegistry();
+  return listing ? gitRegistry(root, ref) : emptyRegistry();
 }
 export function mergeGuard(root, candidate, staged = false) {
   git(root, ["rev-parse", "--verify", "HEAD"]);
   if (staged) {
     const indexed = git(root, ["ls-files", "--stage", "--", REGISTRY]).stdout.trim();
     invariant(indexed, "registry absent from proposed Git index");
-    candidate = JSON.parse(git(root, ["show", `:${REGISTRY}`]).stdout);
+    candidate = gitRegistry(root, "");
   }
   compareRegistry(committedRegistry(root, "HEAD"), candidate);
   const merging = git(root, ["rev-parse", "--verify", "MERGE_HEAD"], true);
