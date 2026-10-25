@@ -1,0 +1,45 @@
+{
+  "title": "Preserve nested folder access",
+  "scope": "Repair folder lifecycle behavior that hides active descendants when a parent is trashed and leaves surviving descendants with a missing parent after permanent deletion or automatic expiry. Promote only direct children to the trashed folder's surviving parent (or root), preserve deeper descendant relationships and all sessions, and scope changes to the folder owner. Restoring the parent must remain possible and must not silently override later explicit moves.\n\n## Out of scope\nDo not recursively delete descendants or sessions, redesign folder navigation or permissions, change retention policy, broadly harden folder concurrency, add historical-data cleanup migrations, or change the policy for individually trashed sessions when their folder is restored first.",
+  "tier": "test-heavy",
+  "why": "The defect affects persisted parent relationships and rendered dashboard navigation; both the authenticated API lifecycle and actual browser visibility are needed alongside the scheduled lower-layer and compiler checks.",
+  "coverage": "docs/validation/manifest.json test-heavy: typecheck checks TypeScript changes; unit-tests executes server/__tests__/routes.test.ts for isolated shared expiry-deletion storage/API behavior; browser-tests runs scripts/run-browser-tests.mjs, which provisions and removes a disposable database and executes tests/folder-expand.spec.ts against authenticated folder APIs and dashboard visibility. The tier is bounded at 900000 ms. The disposable-browser-database path is required; any unavailable prerequisite blocks rather than permitting a weaker tier.",
+  "claim": "native-task-981-preserve-nested-folder-access",
+  "approval": {
+    "reference": "Assigned project Task 981 and its approved scope in the active task assignment.",
+    "direction": "Preserve access to surviving nested folders and sessions across parent trash, restore, permanent deletion, and automatic expiry, with cross-account isolation and actual dashboard coverage.",
+    "applicability": "This revision implements only the assigned Task 981 scope and binds the intended test-heavy workload. The executing Agent remains responsible for current ordinary authorization; the local guard does not authenticate native approval or lifecycle."
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {
+      "requirement": "R1: Trashing a parent keeps its active child, grandchild, and contained sessions reachable",
+      "check": "tests/folder-expand.spec.ts — nested-folder trash/restore journey: create P > C > G and a session in C via authenticated APIs; trash P, reload the dashboard, and assert C and G are visible/navigable with the same session IDs and persisted parent relationships; restore P and assert its intended restoration behavior."
+    },
+    {
+      "requirement": "R2: Parent restoration does not overwrite a later explicit child move",
+      "check": "tests/folder-expand.spec.ts — after trashing P and confirming C is promoted, explicitly move C to another existing folder through the folder API, restore P, and assert C remains at the explicit destination while deeper descendants and sessions remain intact."
+    },
+    {
+      "requirement": "R3: Permanent deletion and the shared expiry deletion operation promote surviving direct children safely",
+      "check": "tests/folder-expand.spec.ts — permanently delete a trashed P in P > C > G and assert C is promoted to P's former parent/root, G still points to C, and C's session IDs survive; server/__tests__/routes.test.ts — isolated database/storage case invokes the same folder deletion operation used by expiry, then asserts no child points at the removed P and deeper relationships and sessions are preserved."
+    },
+    {
+      "requirement": "R4: Lifecycle operations do not change another account's folder tree or sessions",
+      "check": "tests/folder-expand.spec.ts and the isolated server deletion-path case — create a second account's folder/session tree as a control, run parent trash/permanent deletion or expiry for the first owner, then assert the control rows and relationships remain unchanged."
+    },
+    {
+      "requirement": "R5: Dashboard renders surviving nested descendants after parent removal",
+      "check": "tests/folder-expand.spec.ts — after parent trash and after permanent deletion, reload the authenticated dashboard and assert child and grandchild folder headers and the contained session card are visible through ordinary navigation."
+    }
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "This repairs existing persisted folder relationships and a visible dashboard failure; an active child can become unreachable and permanent deletion can leave it attached to a nonexistent parent.",
+    "covers": "Parent trash, restoration, explicit permanent deletion, and shared automatic-expiry deletion must preserve accessible descendants and sessions without changing another user's folder tree or overwriting an explicit later move.",
+    "testLocation": "tests/folder-expand.spec.ts — nested parent trash/restore, explicit child move, permanent deletion, and dashboard visibility; server/__tests__/routes.test.ts — isolated shared expiry-deletion operation.",
+    "assertion": "Using authenticated folder APIs, build P > C > G with a session in C and a second-account control tree; after each lifecycle path assert the child is promoted only as needed, G remains attached to C, session IDs survive, parent pointers never target the deleted folder, the dashboard shows C/G/session after reload, explicit later moves survive restore, and control-account rows remain unchanged."
+  }
+}

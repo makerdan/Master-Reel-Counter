@@ -56,6 +56,45 @@ export function physicalObjectKeyAliases(objectPath: string): [string, string] {
   return [physicalKey, `/objects${physicalKey}`];
 }
 
+/**
+ * Promote direct children and clear folder snapshots before removal. This
+ * helper is exported so the destructive database operation can be exercised
+ * against an isolated Drizzle database.
+ */
+export async function permanentlyDeleteFolderData(database: typeof db, id: number): Promise<void> {
+  const [folder] = await database.select({
+    parentFolderId: folders.parentFolderId,
+    userId: folders.userId,
+  }).from(folders).where(eq(folders.id, id));
+  if (!folder) return;
+
+  await database.update(folders)
+    .set({
+      parentFolderId: folder.parentFolderId,
+      trashedFromParentFolderId: null,
+    })
+    .where(and(
+      eq(folders.parentFolderId, id),
+      eq(folders.userId, folder.userId),
+    ));
+  await database.update(folders)
+    .set({ trashedFromParentFolderId: null })
+    .where(and(
+      eq(folders.trashedFromParentFolderId, id),
+      eq(folders.userId, folder.userId),
+    ));
+  await database.update(countingSessions)
+    .set({ folderId: null, trashedFromFolderId: null })
+    .where(and(
+      eq(countingSessions.userId, folder.userId),
+      or(
+        eq(countingSessions.folderId, id),
+        eq(countingSessions.trashedFromFolderId, id),
+      ),
+    ));
+  await database.delete(folders).where(eq(folders.id, id));
+}
+
 export class InvalidPhotoUploadIntentError extends Error {
   constructor() {
     super("Photo upload intent is invalid or expired");
@@ -1263,17 +1302,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined> {
+    // Any explicit parent choice is a user move, even when it selects the
+    // currently displayed parent. A later restore must not undo that choice.
+    const updates = data.parentFolderId !== undefined
+      ? { ...data, trashedFromParentFolderId: null }
+      : data;
     const [result] = await db.update(folders)
-      .set(data)
+      .set(updates)
       .where(eq(folders.id, id))
       .returning();
     return result;
   }
 
   async softDeleteFolder(id: number): Promise<void> {
+    const folder = await this.getFolder(id);
+    if (!folder) return;
     await db.update(folders)
       .set({ deletedAt: new Date() })
-      .where(eq(folders.id, id));
+      .where(and(
+        eq(folders.id, id),
+        eq(folders.userId, folder.userId),
+      ));
+    // Keep descendants reachable while the parent is in trash. Only direct
+    // children move; deeper relationships and sessions remain attached.
+    await db.update(folders)
+      .set({ parentFolderId: folder.parentFolderId, trashedFromParentFolderId: id })
+      .where(and(
+        eq(folders.parentFolderId, id),
+        eq(folders.userId, folder.userId),
+      ));
     // Snapshot folderId → trashedFromFolderId for ALL sessions in the folder
     // before unlinking, regardless of whether the sessions are themselves
     // trashed. This means a session that was individually trashed before its
@@ -1283,13 +1340,39 @@ export class DatabaseStorage implements IStorage {
     // restore time but retain the snapshot until then.
     await db.update(countingSessions)
       .set({ folderId: null, trashedFromFolderId: id })
-      .where(eq(countingSessions.folderId, id));
+      .where(and(
+        eq(countingSessions.folderId, id),
+        eq(countingSessions.userId, folder.userId),
+      ));
   }
 
   async restoreFolder(id: number): Promise<{ relinkedCount: number; relinkedSessionNames: string[] }> {
+    const folder = await this.getFolder(id);
+    if (!folder) return { relinkedCount: 0, relinkedSessionNames: [] };
     await db.update(folders)
       .set({ deletedAt: null })
-      .where(eq(folders.id, id));
+      .where(and(
+        eq(folders.id, id),
+        eq(folders.userId, folder.userId),
+      ));
+    // Reattach only children still at the automatically promoted location.
+    // Explicit folder moves clear this snapshot in updateFolder and survive
+    // restoring the old parent.
+    await db.update(folders)
+      .set({ parentFolderId: id, trashedFromParentFolderId: null })
+      .where(and(
+        eq(folders.trashedFromParentFolderId, id),
+        eq(folders.userId, folder.userId),
+        folder.parentFolderId === null
+          ? isNull(folders.parentFolderId)
+          : eq(folders.parentFolderId, folder.parentFolderId),
+      ));
+    await db.update(folders)
+      .set({ trashedFromParentFolderId: null })
+      .where(and(
+        eq(folders.trashedFromParentFolderId, id),
+        eq(folders.userId, folder.userId),
+      ));
     // Relink active (non-trashed) sessions that were snapshotted from this folder
     // AND that are still at root (folderId IS NULL). If folderId is non-null the
     // user explicitly moved the session to a different folder while the original
@@ -1300,23 +1383,22 @@ export class DatabaseStorage implements IStorage {
         eq(countingSessions.trashedFromFolderId, id),
         isNull(countingSessions.deletedAt),
         isNull(countingSessions.folderId),
+        eq(countingSessions.userId, folder.userId),
       ))
       .returning({ id: countingSessions.id, name: countingSessions.name });
     // Clear snapshots for sessions that were moved elsewhere so we don't leave
     // stale trashedFromFolderId values on rows we decided not to relink.
     await db.update(countingSessions)
       .set({ trashedFromFolderId: null })
-      .where(eq(countingSessions.trashedFromFolderId, id));
+      .where(and(
+        eq(countingSessions.trashedFromFolderId, id),
+        eq(countingSessions.userId, folder.userId),
+      ));
     return { relinkedCount: relinked.length, relinkedSessionNames: relinked.map(r => r.name) };
   }
 
   async permanentDeleteFolder(id: number): Promise<void> {
-    // Clear any lingering snapshots so sessions aren't left with an orphaned
-    // trashedFromFolderId pointing at a now-deleted folder.
-    await db.update(countingSessions)
-      .set({ trashedFromFolderId: null })
-      .where(eq(countingSessions.trashedFromFolderId, id));
-    await db.delete(folders).where(eq(folders.id, id));
+    await permanentlyDeleteFolderData(db, id);
   }
 
   async getExpiredTrashFolders(olderThanDays: number): Promise<Folder[]> {
@@ -1329,10 +1411,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteFolder(id: number): Promise<void> {
-    await db.update(countingSessions)
-      .set({ folderId: null })
-      .where(eq(countingSessions.folderId, id));
-    await db.delete(folders).where(eq(folders.id, id));
+    await permanentlyDeleteFolderData(db, id);
   }
 
   async duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string, copyFileCallback?: (srcKey: string) => Promise<string>): Promise<Session> {

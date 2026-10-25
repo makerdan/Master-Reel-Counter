@@ -232,6 +232,13 @@
       "when": 1776636000019,
       "tag": "0028_add_entry_operation_id",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792875600000,
+      "tag": "0029_add_folder_parent_trash_snapshot",
+      "breakpoints": true
     }
   ]
 }

@@ -49,6 +49,7 @@ export const folders = pgTable("folders", {
   userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
   parentFolderId: integer("parent_folder_id"),
+  trashedFromParentFolderId: integer("trashed_from_parent_folder_id"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"),

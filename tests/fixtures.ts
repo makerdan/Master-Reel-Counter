@@ -202,6 +202,7 @@ type E2EFixtures = {
   sessionId: number;
   secondApprovedIdentity: {
     email: string;
+    userId: string;
   };
 };
 
@@ -351,7 +352,7 @@ export const test = base.extend<E2EFixtures>({
          VALUES ($1, $2, $3, 'Second', 'Playwright', true, false, 'Admin')`,
         [localUserId, clerkUser.id, email],
       );
-      await use({ email });
+      await use({ email, userId: localUserId });
     } finally {
       try {
         await database.query("DELETE FROM users WHERE id = $1", [localUserId]);

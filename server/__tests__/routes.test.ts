@@ -18,6 +18,101 @@ import {
 } from "../lib/labelScanResources";
 import { cropPhoto } from "../lib/cropPhoto";
 
+test("permanent folder deletion promotes descendants in an isolated database", { timeout: 30000 }, async (t) => {
+  const schema = `folder_lifecycle_${process.pid}_${randomUUID().replaceAll("-", "")}`;
+  const setup = await pool.connect();
+  let isolatedPool: pg.Pool | undefined;
+  t.after(async () => {
+    await isolatedPool?.end();
+    try {
+      await setup.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    } finally {
+      setup.release();
+    }
+  });
+
+  await setup.query(`CREATE SCHEMA "${schema}"`);
+  await setup.query(`
+    CREATE TABLE "${schema}".folders (
+      id serial PRIMARY KEY,
+      user_id varchar NOT NULL,
+      name text NOT NULL,
+      parent_folder_id integer,
+      trashed_from_parent_folder_id integer,
+      sort_order integer NOT NULL DEFAULT 0,
+      created_at timestamp NOT NULL DEFAULT now(),
+      deleted_at timestamp
+    )
+  `);
+  await setup.query(`
+    CREATE TABLE "${schema}".counting_sessions (
+      id serial PRIMARY KEY,
+      user_id varchar NOT NULL,
+      folder_id integer,
+      name text NOT NULL,
+      started_at timestamp NOT NULL DEFAULT now(),
+      trashed_from_folder_id integer
+    )
+  `);
+  isolatedPool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    options: `-c search_path=${schema} -c statement_timeout=10000 -c lock_timeout=8000`,
+    application_name: schema,
+    connectionTimeoutMillis: 5000,
+  });
+  const isolated = drizzle(isolatedPool, { schema: databaseSchema });
+
+  const insertFolder = async (userId: string, name: string, parentId: number | null = null) => {
+    const result = await isolatedPool!.query(
+      `INSERT INTO folders (user_id, name, parent_folder_id) VALUES ($1, $2, $3) RETURNING id`,
+      [userId, name, parentId],
+    );
+    return result.rows[0].id as number;
+  };
+  const insertSession = async (userId: string, name: string, folderId: number) => {
+    const result = await isolatedPool!.query(
+      `INSERT INTO counting_sessions (user_id, name, folder_id) VALUES ($1, $2, $3) RETURNING id`,
+      [userId, name, folderId],
+    );
+    return result.rows[0].id as number;
+  };
+
+  const parentId = await insertFolder("owner-one", "parent");
+  const childId = await insertFolder("owner-one", "child");
+  await isolatedPool.query(
+    `UPDATE folders SET deleted_at = now() WHERE id = $1`,
+    [parentId],
+  );
+  await isolatedPool.query(
+    `UPDATE folders SET trashed_from_parent_folder_id = $1 WHERE id = $2`,
+    [parentId, childId],
+  );
+  const grandchildId = await insertFolder("owner-one", "grandchild", childId);
+  const childSessionId = await insertSession("owner-one", "child-session", childId);
+  const otherParentId = await insertFolder("owner-two", "other-parent");
+  const otherChildId = await insertFolder("owner-two", "other-child", otherParentId);
+  const otherSessionId = await insertSession("owner-two", "other-session", otherChildId);
+
+  await permanentlyDeleteFolderData(isolated, parentId);
+
+  const remainingFolders = await isolatedPool.query(
+    `SELECT id, user_id, parent_folder_id, trashed_from_parent_folder_id FROM folders ORDER BY id`,
+  );
+  assert.deepEqual(remainingFolders.rows, [
+    { id: childId, user_id: "owner-one", parent_folder_id: null, trashed_from_parent_folder_id: null },
+    { id: grandchildId, user_id: "owner-one", parent_folder_id: childId, trashed_from_parent_folder_id: null },
+    { id: otherParentId, user_id: "owner-two", parent_folder_id: null, trashed_from_parent_folder_id: null },
+    { id: otherChildId, user_id: "owner-two", parent_folder_id: otherParentId, trashed_from_parent_folder_id: null },
+  ]);
+  const remainingSessions = await isolatedPool.query(
+    `SELECT id, user_id, folder_id FROM counting_sessions ORDER BY id`,
+  );
+  assert.deepEqual(remainingSessions.rows, [
+    { id: childSessionId, user_id: "owner-one", folder_id: childId },
+    { id: otherSessionId, user_id: "owner-two", folder_id: otherChildId },
+  ]);
+});
+
 describe("label scan resource boundaries", () => {
   const pin = (photoId: number, pinId = photoId) => ({
     photoId, pinId, x: 50, y: 50, zoomLevel: 1,
@@ -254,7 +349,7 @@ import
  from "../db.js"
 ;
 import { eq } from "drizzle-orm";
-import { storage } from "../storage.js";
+import { permanentlyDeleteFolderData, storage } from "../storage.js";
 
 import 
 {
@@ -321,6 +416,7 @@ import
 after(async () => {
   await pool.end().catch(() => {});
 });
+
 
 test("approval transitions — persisted state and mounted HTTP boundaries", { timeout: 30000 }, async (t) => {
   const schema = `approval_${process.pid}_${randomUUID().replaceAll("-", "")}`;

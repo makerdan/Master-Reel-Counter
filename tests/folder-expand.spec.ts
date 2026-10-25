@@ -7,9 +7,231 @@
  * auto-expand the target folder — a behaviour that is easily missed when only
  * the create-and-move path is tested.
  */
+import pg from "pg";
 import { test, expect, createSessionViaApi } from "./fixtures";
 
+type FolderRecord = {
+  id: number;
+  name: string;
+  parentFolderId: number | null;
+  deletedAt: string | null;
+  trashedFromParentFolderId?: number | null;
+};
+
+async function expectOk(response: {
+  ok(): boolean;
+  status(): number;
+  text(): Promise<string>;
+}) {
+  if (!response.ok()) {
+    throw new Error(`Expected successful API response, received ${response.status()}: ${await response.text()}`);
+  }
+}
+
+async function createFolder(
+  request: Parameters<typeof createSessionViaApi>[0],
+  name: string,
+  parentFolderId: number | null = null,
+): Promise<FolderRecord> {
+  const created = await request.post("/api/folders", { data: { name } });
+  await expectOk(created);
+  let folder = await created.json() as FolderRecord;
+  if (parentFolderId !== null) {
+    const moved = await request.patch(`/api/folders/${folder.id}`, { data: { parentFolderId } });
+    await expectOk(moved);
+    folder = await moved.json() as FolderRecord;
+  }
+  return folder;
+}
+
+async function getFolders(request: Parameters<typeof createSessionViaApi>[0]) {
+  const response = await request.get("/api/folders");
+  await expectOk(response);
+  return response.json() as Promise<FolderRecord[]>;
+}
+
+async function moveSessionToFolder(
+  request: Parameters<typeof createSessionViaApi>[0],
+  sessionId: number,
+  folderId: number | null,
+) {
+  const response = await request.post(`/api/sessions/${sessionId}/move`, { data: { folderId } });
+  await expectOk(response);
+  return response.json() as Promise<{ id: number; folderId: number | null }>;
+}
+
+async function permanentlyRemoveFolder(
+  request: Parameters<typeof createSessionViaApi>[0],
+  folderId: number,
+) {
+  const trashed = await request.delete(`/api/folders/${folderId}`);
+  await expectOk(trashed);
+  const deleted = await request.delete(`/api/folders/${folderId}/permanent`);
+  await expectOk(deleted);
+}
+
 test.describe("folder auto-expand @folder-expand", () => {
+  test("parent trash, restore, and permanent deletion preserve nested folders and sessions", async ({
+    page,
+    request,
+    cleanupIds,
+    secondApprovedIdentity,
+  }) => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const secondDatabase = new pg.Client({
+      connectionString: process.env.DATABASE_URL,
+      statement_timeout: 10_000,
+      connectionTimeoutMillis: 5_000,
+    });
+    let connected = false;
+    let otherParentId: number | undefined;
+    let otherChildId: number | undefined;
+    let otherSessionId: number | undefined;
+    try {
+      await secondDatabase.connect();
+      connected = true;
+      const first = await createFolder(request, `Nested parent ${suffix}`);
+      const child = await createFolder(request, `Nested child ${suffix}`, first.id);
+      const grandchild = await createFolder(request, `Nested grandchild ${suffix}`, child.id);
+      const session = await createSessionViaApi(request, `Nested session ${suffix}`);
+      cleanupIds.push(session.id);
+      await moveSessionToFolder(request, session.id, child.id);
+      const moveTarget = await createFolder(request, `Nested move target ${suffix}`);
+
+      const otherParent = await secondDatabase.query(
+        `INSERT INTO folders (user_id, name) VALUES ($1, $2) RETURNING id`,
+        [secondApprovedIdentity.userId, `Other parent ${suffix}`],
+      );
+      otherParentId = Number(otherParent.rows[0].id);
+      const otherChild = await secondDatabase.query(
+        `INSERT INTO folders (user_id, name, parent_folder_id) VALUES ($1, $2, $3) RETURNING id`,
+        [secondApprovedIdentity.userId, `Other child ${suffix}`, otherParentId],
+      );
+      otherChildId = Number(otherChild.rows[0].id);
+      const otherSession = await secondDatabase.query(
+        `INSERT INTO counting_sessions (user_id, name, folder_id) VALUES ($1, $2, $3) RETURNING id`,
+        [secondApprovedIdentity.userId, `Other session ${suffix}`, otherChildId],
+      );
+      otherSessionId = Number(otherSession.rows[0].id);
+
+      const firstTrash = await request.delete(`/api/folders/${first.id}`);
+      await expectOk(firstTrash);
+      let active = await getFolders(request);
+      expect(active.find((folder) => folder.id === child.id)?.parentFolderId).toBeNull();
+      expect(active.find((folder) => folder.id === grandchild.id)?.parentFolderId).toBe(child.id);
+      const sessionAfterDelete = await request.get(`/api/sessions/${session.id}`);
+      expect(sessionAfterDelete.ok()).toBeTruthy();
+      expect((await sessionAfterDelete.json()).folderId).toBe(child.id);
+
+      await page.reload();
+      await expect(page.locator(`[data-testid="folder-header-${child.id}"]`)).toBeVisible();
+      await page.locator(`[data-testid="button-toggle-folder-${child.id}"]`).click();
+      await expect(page.locator(`[data-testid="folder-header-${grandchild.id}"]`)).toBeVisible();
+      await expect(page.locator(`[data-testid="card-session-${session.id}"]`)).toBeVisible();
+      await page.locator(`[data-testid="button-toggle-folder-${grandchild.id}"]`).click();
+
+      const firstRestore = await request.post(`/api/folders/${first.id}/restore`);
+      await expectOk(firstRestore);
+      active = await getFolders(request);
+      expect(active.find((folder) => folder.id === child.id)?.parentFolderId).toBe(first.id);
+      expect(active.find((folder) => folder.id === grandchild.id)?.parentFolderId).toBe(child.id);
+
+      const secondParent = await createFolder(request, `Restore parent ${suffix}`);
+      const secondChild = await createFolder(request, `Restore child ${suffix}`, secondParent.id);
+      const secondGrandchild = await createFolder(request, `Restore grandchild ${suffix}`, secondChild.id);
+      const restoreSession = await createSessionViaApi(request, `Restore session ${suffix}`);
+      cleanupIds.push(restoreSession.id);
+      await moveSessionToFolder(request, restoreSession.id, secondChild.id);
+      await request.delete(`/api/folders/${secondParent.id}`);
+      active = await getFolders(request);
+      expect(active.find((folder) => folder.id === secondChild.id)?.parentFolderId).toBeNull();
+      const restored = await request.post(`/api/folders/${secondParent.id}/restore`);
+      await expectOk(restored);
+      active = await getFolders(request);
+      expect(active.find((folder) => folder.id === secondChild.id)?.parentFolderId).toBe(secondParent.id);
+      expect(active.find((folder) => folder.id === secondGrandchild.id)?.parentFolderId).toBe(secondChild.id);
+
+      const movedParent = await createFolder(request, `Moved parent ${suffix}`);
+      const movedChild = await createFolder(request, `Moved child ${suffix}`, movedParent.id);
+      const movedGrandchild = await createFolder(request, `Moved grandchild ${suffix}`, movedChild.id);
+      await request.delete(`/api/folders/${movedParent.id}`);
+      const explicitMove = await request.patch(`/api/folders/${movedChild.id}`, {
+        data: { parentFolderId: moveTarget.id },
+      });
+      await expectOk(explicitMove);
+      const movedRestore = await request.post(`/api/folders/${movedParent.id}/restore`);
+      await expectOk(movedRestore);
+      active = await getFolders(request);
+      expect(active.find((folder) => folder.id === movedChild.id)?.parentFolderId).toBe(moveTarget.id);
+      expect(active.find((folder) => folder.id === movedGrandchild.id)?.parentFolderId).toBe(movedChild.id);
+
+      const permanentParent = await createFolder(request, `Permanent parent ${suffix}`);
+      const permanentChild = await createFolder(request, `Permanent child ${suffix}`, permanentParent.id);
+      const permanentGrandchild = await createFolder(request, `Permanent grandchild ${suffix}`, permanentChild.id);
+      const permanentSession = await createSessionViaApi(request, `Permanent session ${suffix}`);
+      cleanupIds.push(permanentSession.id);
+      await moveSessionToFolder(request, permanentSession.id, permanentChild.id);
+      await permanentlyRemoveFolder(request, permanentParent.id);
+      active = await getFolders(request);
+      expect(active.find((folder) => folder.id === permanentParent.id)).toBeUndefined();
+      expect(active.find((folder) => folder.id === permanentChild.id)?.parentFolderId).toBeNull();
+      expect(active.find((folder) => folder.id === permanentGrandchild.id)?.parentFolderId).toBe(permanentChild.id);
+      const permanentSessionRead = await request.get(`/api/sessions/${permanentSession.id}`);
+      expect(permanentSessionRead.ok()).toBeTruthy();
+      expect((await permanentSessionRead.json()).folderId).toBe(permanentChild.id);
+      await page.reload();
+      await expect(page.locator(`[data-testid="folder-header-${permanentChild.id}"]`)).toBeVisible();
+      await page.locator(`[data-testid="button-toggle-folder-${permanentChild.id}"]`).click();
+      await expect(page.locator(`[data-testid="folder-header-${permanentGrandchild.id}"]`)).toBeVisible();
+      await expect(page.locator(`[data-testid="card-session-${permanentSession.id}"]`)).toBeVisible();
+
+      const otherRows = await secondDatabase.query(
+        `SELECT f.id, f.parent_folder_id, f.trashed_from_parent_folder_id, s.id AS session_id, s.folder_id AS session_folder_id
+         FROM folders f LEFT JOIN counting_sessions s ON s.folder_id = f.id
+         WHERE f.id = ANY($1::int[]) ORDER BY f.id`,
+        [[otherParentId, otherChildId]],
+      );
+      expect(otherRows.rows).toEqual([
+        {
+          id: otherParentId,
+          parent_folder_id: null,
+          trashed_from_parent_folder_id: null,
+          session_id: null,
+          session_folder_id: null,
+        },
+        {
+          id: otherChildId,
+          parent_folder_id: otherParentId,
+          trashed_from_parent_folder_id: null,
+          session_id: otherSessionId,
+          session_folder_id: otherChildId,
+        },
+      ]);
+    } finally {
+      if (connected) {
+        if (otherSessionId) await secondDatabase.query("DELETE FROM counting_sessions WHERE id = $1", [otherSessionId]);
+        if (otherChildId) await secondDatabase.query("DELETE FROM folders WHERE id = $1", [otherChildId]);
+        if (otherParentId) await secondDatabase.query("DELETE FROM folders WHERE id = $1", [otherParentId]);
+      }
+      await secondDatabase.end().catch(() => {});
+
+      const active = await request.get("/api/folders").catch(() => null);
+      if (active?.ok()) {
+        const rows = await active.json() as FolderRecord[];
+        for (const row of rows.filter((folder) => folder.name.endsWith(suffix))) {
+          await request.delete(`/api/folders/${row.id}`).catch(() => {});
+        }
+      }
+      const trash = await request.get("/api/folders/trash").catch(() => null);
+      if (trash?.ok()) {
+        const rows = await trash.json() as FolderRecord[];
+        for (const row of rows.filter((folder) => folder.name.endsWith(suffix))) {
+          await request.delete(`/api/folders/${row.id}/permanent`).catch(() => {});
+        }
+      }
+    }
+  });
+
   test("creating a folder and moving a session into it auto-expands the folder", async ({
     page,
     request,
@@ -26,7 +248,7 @@ test.describe("folder auto-expand @folder-expand", () => {
     const folderName = `AutoExpand ${Date.now()}`;
 
     try {
-      await page.goto("/");
+      await page.reload();
       await page.waitForLoadState("domcontentloaded");
 
       // Open session context menu
