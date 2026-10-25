@@ -141,7 +141,7 @@
     "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
-    "@clerk/testing": "^2.2.33",
+    "@clerk/testing": "^2.2.49",
     "@playwright/test": "^1.60.0",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
