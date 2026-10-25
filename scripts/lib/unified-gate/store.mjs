@@ -174,7 +174,7 @@ export function compareRegistry(base, candidate) {
       `committed task history rewritten: ${id}`);
   }
 }
-export function git(root, args, allowedFailure = false, maxBuffer = 4_000_000) {
+export function git(root, args, allowedFailure = false, maxBuffer = 32_000_000) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 3000, maxBuffer });
   if (!allowedFailure) invariant(result.status === 0, `git prerequisite failed: ${args[0]}`);
   return result;

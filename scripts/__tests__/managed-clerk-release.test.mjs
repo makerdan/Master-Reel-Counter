@@ -627,14 +627,23 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
     browserSetup,
     /assertReleaseSchema\(database\);[\s\S]*clerk\.users\.createUser/,
   );
-  assert.match(browserRunner, /CREATE DATABASE/);
+  const browserDatabaseBoundary = readFileSync(
+    resolve(root, "scripts/lib/browser-test-database.mjs"), "utf8",
+  );
+  assert.match(browserRunner, /createTemporaryDatabase,[\s\S]*dropTemporaryDatabase,[\s\S]*from "\.\/lib\/browser-test-database\.mjs"/);
+  assert.match(browserDatabaseBoundary, /CREATE DATABASE/);
+  const browserDatabaseCreate = browserRunner.indexOf("await createTemporaryDatabase(temporaryDatabase)");
+  assert.ok(browserDatabaseCreate >= 0, "browser runner must invoke its database boundary");
   assert(
     browserRunner.indexOf("assertIsolatedReleaseDatabase({", browserRunner.indexOf("else {")) <
-      browserRunner.indexOf("createTemporaryDatabase(databaseName, browserDatabaseUrl)"),
+      browserDatabaseCreate,
     "automatic browser database isolation must be established before CREATE DATABASE",
   );
+  assert.ok(browserRunner.indexOf("temporaryDatabase = {") < browserDatabaseCreate,
+    "ownership must be retained before an ambiguous CREATE result");
   assert.match(browserRunner, /prepare-release-test-database\.mjs/);
-  assert.match(browserRunner, /DROP DATABASE IF EXISTS/);
+  assert.match(browserRunner, /await dropTemporaryDatabase\(temporaryDatabase\)/);
+  assert.match(browserDatabaseBoundary, /DROP DATABASE IF EXISTS/);
   assert.match(browserRunner, /RELEASE_SMOKE_DATABASE_URL/);
   assert.match(browserRunner, /RELEASE_PUBLICATION_DATABASE_URL/);
   assert.match(browserRunner, /RELEASE_PUBLICATION_SCHEMA_PREFLIGHT: "0"/);

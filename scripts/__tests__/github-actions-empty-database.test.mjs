@@ -17,9 +17,15 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { Pool } from "pg";
+import { Client, Pool } from "pg";
 import test from "node:test";
 import { runOwnedProcessGroup } from "../lib/owned-process-group.mjs";
+import {
+  createTemporaryDatabase,
+  dropTemporaryDatabase,
+  endBrowserDatabaseClient,
+  withBrowserDatabaseClient,
+} from "../lib/browser-test-database.mjs";
 import {
   postgresMajorVersion,
   SUPPORTED_POSTGRES_MAJOR_VERSION,
@@ -81,9 +87,15 @@ function postgresMessage(type, payload = Buffer.alloc(0)) {
 
 async function createStalledPostgresServer(stallAt) {
   const sockets = new Set();
-  const server = createServer((socket) => {
+  const queries = [];
+  let shutdowns = 0;
+  const server = createServer({ allowHalfOpen: true }, (socket) => {
     sockets.add(socket);
     socket.on("close", () => sockets.delete(socket));
+    socket.on("error", () => {});
+    socket.on("end", () => {
+      if (stallAt !== "shutdown") socket.end();
+    });
     let received = Buffer.alloc(0);
     let startupComplete = false;
     let handshakeSent = false;
@@ -110,7 +122,39 @@ async function createStalledPostgresServer(stallAt) {
           postgresMessage("Z", ready),
         ]));
       }
-      // Deliberately withhold the query response once the client sends its query.
+      while (received.length >= 5) {
+        const type = received.toString("ascii", 0, 1);
+        const length = received.readUInt32BE(1);
+        if (received.length < length + 1) break;
+        const payload = received.subarray(5, length + 1);
+        received = received.subarray(length + 1);
+        if (type === "X") {
+          shutdowns++;
+          if (stallAt !== "shutdown") socket.end();
+          continue;
+        }
+        if (type === "Q" || type === "P") {
+          const query = payload.toString("utf8").replace(/^\0/, "").split("\0")[0];
+          queries.push(query);
+          if (stallAt === "query" ||
+              (stallAt === "create" && query.startsWith("CREATE")) ||
+              (stallAt === "terminate" && query.includes("pg_terminate_backend")) ||
+              (stallAt === "drop" && query.startsWith("DROP"))) {
+            // All subsequent frames in this request must remain unanswered too.
+            socket.removeAllListeners("data");
+            return;
+          }
+        }
+        if (type === "P") socket.write(postgresMessage("1"));
+        if (type === "B") socket.write(postgresMessage("2"));
+        if (type === "D") socket.write(postgresMessage("n"));
+        if (type === "Q" || type === "E") {
+          socket.write(postgresMessage("C", Buffer.from("SELECT 0\0")));
+        }
+        if (type === "Q" || type === "S") {
+          socket.write(postgresMessage("Z", Buffer.from("I")));
+        }
+      }
     });
   });
   await new Promise((resolveListen, reject) => {
@@ -121,6 +165,9 @@ async function createStalledPostgresServer(stallAt) {
   assert.ok(address && typeof address === "object", "stalled PostgreSQL fixture did not bind");
   return {
     connectionString: `postgres://postgres@127.0.0.1:${address.port}/postgres`,
+    queries,
+    activeConnections: () => sockets.size,
+    shutdowns: () => shutdowns,
     close: async () => {
       for (const socket of sockets) socket.destroy();
       await new Promise((resolveClose, reject) => {
@@ -473,6 +520,84 @@ test("PostgreSQL pool shutdown reports an unresponsive end within its cleanup bo
     /pool shutdown exceeded 30ms/,
   );
   assert.ok(Date.now() - startedAt < 500, "unresponsive pool shutdown exceeded its cleanup reporting bound");
+});
+
+test("browser database boundary bounds real PostgreSQL startup, create, terminate, drop and shutdown stalls", { timeout: 15_000 }, async (t) => {
+  for (const phase of ["startup", "create", "terminate", "drop", "shutdown", "none"]) {
+    await t.test(phase, async () => {
+      const fixture = await createStalledPostgresServer(phase);
+      const clients = [];
+      const options = {
+        timeouts: { connectMs: 150, queryMs: 150, shutdownMs: 150 },
+        createClient: (config) => {
+          const client = new Client(config);
+          clients.push(client);
+          return client;
+        },
+      };
+      const database = { databaseName: "browser_test_fixture", adminUrl: fixture.connectionString };
+      const startedAt = Date.now();
+      try {
+        if (phase === "none") {
+          await createTemporaryDatabase(database, options);
+          await dropTemporaryDatabase(database, options);
+        } else {
+          await assert.rejects(
+            phase === "terminate" || phase === "drop"
+              ? dropTemporaryDatabase(database, options)
+              : createTemporaryDatabase(database, options),
+            phase === "startup" ? /connect|timeout/i
+              : phase === "shutdown" ? /client shutdown exceeded 150ms/
+                : /query read timeout|exceeded 150ms/i,
+          );
+        }
+        assert.ok(Date.now() - startedAt < 2_000, `${phase} exceeded its database cleanup budget`);
+        if (phase !== "startup") {
+          assert.ok(fixture.queries.length > 0, `${phase} did not reach the SQL boundary`);
+        }
+        if (phase === "drop" || phase === "none") {
+          assert.ok(fixture.queries.some((query) => query.startsWith("DROP DATABASE")));
+        }
+        if (phase === "shutdown") assert.equal(fixture.shutdowns(), 1);
+        assert.ok(clients.every((client) => client.connection.stream.destroyed),
+          `${phase} left a client transport alive`);
+        // Do not let fixture teardown hide a leaked client socket.
+        const deadline = Date.now() + 1_000;
+        while (phase !== "shutdown" && fixture.activeConnections() && Date.now() < deadline) await sleep(10);
+        // A half-open fixture intentionally retains its writable side; verify
+        // actual client transport destruction separately in the shutdown test.
+        if (phase !== "shutdown") assert.equal(fixture.activeConnections(), 0);
+      } finally {
+        await fixture.close();
+      }
+    });
+  }
+});
+
+test("browser database cleanup preserves the primary error and force-closes an unresponsive shutdown", async () => {
+  const primary = new Error("original browser database failure");
+  let destroyed = false;
+  const startedAt = Date.now();
+  const client = {
+    on() {},
+    connect: async () => {},
+    end: () => new Promise(() => {}),
+    connection: { stream: { destroy() { destroyed = true; } } },
+  };
+  await assert.rejects(withBrowserDatabaseClient("unused", async () => { throw primary; }, {
+    createClient: () => client,
+    timeouts: { shutdownMs: 30 },
+  }), (error) => {
+    assert.equal(error, primary);
+    assert.equal(error.message, "original browser database failure");
+    assert.match(error.cleanupErrors[0].message, /client shutdown exceeded 30ms/);
+    return true;
+  });
+  assert.equal(destroyed, true);
+  assert.ok(Date.now() - startedAt < 500);
+  destroyed = false;
+  await assert.rejects(endBrowserDatabaseClient(client, 30), /client shutdown exceeded 30ms/);
+  assert.equal(destroyed, true);
 });
 
 test("command supervision preserves normal exit codes and separate diagnostics", async (t) => {

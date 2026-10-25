@@ -16,6 +16,15 @@ import { run, classificationLog } from "../lib/unified-gate/execution.mjs";
 import { summaryHistory, eligibility } from "../lib/unified-gate/summaries.mjs";
 
 const project = resolve(import.meta.dirname, "../..");
+test("gate Git reads retain complete registries larger than four megabytes", (t) => {
+  const root = fixture(t);
+  const content = JSON.stringify({ payload: "x".repeat(4_100_000) });
+  write(root, "large-registry.json", content);
+  git(root, ["add", "large-registry.json"]);
+  git(root, ["commit", "-qm", "large registry fixture"]);
+  assert.equal(git(root, ["show", "HEAD:large-registry.json"]).stdout, content);
+});
+
 function write(root, path, content) {
   mkdirSync(dirname(join(root, path)), { recursive: true });
   writeFileSync(join(root, path), typeof content === "string" ? content : JSON.stringify(content, null, 2) + "\n");

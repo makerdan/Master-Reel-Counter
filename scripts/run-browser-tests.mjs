@@ -2,7 +2,10 @@
 
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { Client } from "pg";
+import {
+  createTemporaryDatabase,
+  dropTemporaryDatabase,
+} from "./lib/browser-test-database.mjs";
 import { assertIsolatedReleaseDatabase } from "./release-schema-preflight.mjs";
 import { formatBrowserProjectCoverage } from "./lib/browser-project-coverage.mjs";
 import {
@@ -21,43 +24,6 @@ function databaseUrlWithName(urlString, databaseName) {
   const url = new URL(urlString);
   url.pathname = `/${encodeURIComponent(databaseName)}`;
   return url.toString();
-}
-
-function quoteIdentifier(identifier) {
-  return `"${identifier.replaceAll('"', '""')}"`;
-}
-
-async function createTemporaryDatabase(databaseName, databaseUrl) {
-  const adminUrl = databaseUrlWithName(sourceDatabaseUrl, "postgres");
-  const admin = new Client({ connectionString: adminUrl });
-  await admin.connect();
-  try {
-    await admin.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
-  } finally {
-    await admin.end();
-  }
-  return {
-    databaseName,
-    databaseUrl,
-    adminUrl,
-  };
-}
-
-async function dropTemporaryDatabase({ databaseName, adminUrl }) {
-  const admin = new Client({ connectionString: adminUrl });
-  await admin.connect();
-  try {
-    await admin.query(
-      `SELECT pg_terminate_backend(pid)
-       FROM pg_stat_activity
-       WHERE datname = $1
-         AND pid <> pg_backend_pid()`,
-      [databaseName],
-    );
-    await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)}`);
-  } finally {
-    await admin.end();
-  }
 }
 
 let temporaryDatabase;
@@ -113,7 +79,14 @@ try {
         releaseDatabaseUrl: browserDatabaseUrl,
         publicationDatabaseUrl: sourceDatabaseUrl,
       });
-      temporaryDatabase = await createTemporaryDatabase(databaseName, browserDatabaseUrl);
+      // Retain ownership even if CREATE succeeds remotely but its response or
+      // client shutdown stalls. Cleanup still has to attempt the generated name.
+      temporaryDatabase = {
+        databaseName,
+        databaseUrl: browserDatabaseUrl,
+        adminUrl: databaseUrlWithName(sourceDatabaseUrl, "postgres"),
+      };
+      await createTemporaryDatabase(temporaryDatabase);
       browserDatabaseUrl = temporaryDatabase.databaseUrl;
     }
 
