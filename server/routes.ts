@@ -548,8 +548,12 @@ export const accountCapabilityMiddleware: RequestHandler = async (req: any, res,
   let capability: UserCapability | undefined;
   if (
     req.method === "POST" &&
-    (path === "/api/sessions" || path.endsWith("/duplicate"))
+    (path === "/api/sessions" || /^\/api\/sessions\/[^/]+\/duplicate\/?$/i.test(path))
   ) capability = "session_create";
+  else if (
+    req.method === "POST" &&
+    /^\/api\/photos\/[^/]+\/duplicate\/?$/i.test(path)
+  ) capability = "photo_management";
   else if (
     (req.method === "DELETE" && /^\/api\/sessions\/[^/]+(?:\/(?:permanent))?$/.test(path)) ||
     (req.method === "POST" && (

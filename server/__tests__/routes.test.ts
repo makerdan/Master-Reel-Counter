@@ -3150,7 +3150,9 @@ describe("account capability route guard", () => {
   let capabilities = {
     ai_scanning: false,
     photo_management: false,
+    session_create: true,
   };
+  let mutationCalls = 0;
   const userId = "capability-route-test-user";
   const originalGetUser = authStorage.getUser;
 
@@ -3175,6 +3177,13 @@ describe("account capability route guard", () => {
     app.post("/api/photos/:photoId/analyze-labels", (_req, res) => res.json({ ok: true }));
     app.post("/api/sessions/:sessionId/analyze-labels", (_req, res) => res.json({ ok: true }));
     app.patch("/api/photos/:photoId", (_req, res) => res.json({ ok: true }));
+    const mutationHandler: express.RequestHandler = (_req, res) => {
+      mutationCalls++;
+      res.json({ ok: true });
+    };
+    app.post("/api/photos/:photoId/duplicate", mutationHandler);
+    app.post("/api/sessions/:sessionId/duplicate", mutationHandler);
+    app.post("/api/sessions", mutationHandler);
 
     server = http.createServer(app);
     baseUrl = await listenOnLoopback(server);
@@ -3201,6 +3210,7 @@ describe("account capability route guard", () => {
       capabilities = {
         ai_scanning: combination.ai_scanning,
         photo_management: combination.photo_management,
+        session_create: true,
       };
       for (const path of labelPaths) {
         const response = await httpReq(baseUrl, "POST", path);
@@ -3228,6 +3238,40 @@ describe("account capability route guard", () => {
           message: "capability_denied",
           capability: "photo_management",
         });
+      }
+    }
+  });
+
+  test("duplication capability matrix keeps photo management separate from session creation", async () => {
+    for (const sessionCreate of [false, true]) {
+      for (const photoManagement of [false, true]) {
+        capabilities = {
+          ai_scanning: false,
+          session_create: sessionCreate,
+          photo_management: photoManagement,
+        };
+        // Exercise Express's default case-insensitive and optional trailing-slash
+        // routing too, so alternate spellings cannot bypass the session rule.
+        const operations = [
+          { path: "/api/photos/12/duplicate", allowed: photoManagement, capability: "photo_management" },
+          { path: "/api/photos/12/duplicate/?source=grid", allowed: photoManagement, capability: "photo_management" },
+          { path: "/api/PHOTOS/12/duplicate", allowed: photoManagement, capability: "photo_management" },
+          { path: "/API/PHOTOS/12/DUPLICATE/?source=grid", allowed: photoManagement, capability: "photo_management" },
+          { path: "/api/sessions/34/duplicate", allowed: sessionCreate, capability: "session_create" },
+          { path: "/api/sessions/34/duplicate/?source=dashboard", allowed: sessionCreate, capability: "session_create" },
+          { path: "/api/sessions/34/DUPLICATE", allowed: sessionCreate, capability: "session_create" },
+          { path: "/api/sessions", allowed: sessionCreate, capability: "session_create" },
+        ];
+        for (const operation of operations) {
+          const callsBefore = mutationCalls;
+          const response = await httpReq(baseUrl, "POST", operation.path);
+          const context = `${operation.path}: session_create=${sessionCreate}, photo_management=${photoManagement}`;
+          assert.equal(response.status, operation.allowed ? 200 : 403, context);
+          assert.equal(mutationCalls, callsBefore + (operation.allowed ? 1 : 0), context);
+          assert.deepEqual(response.body, operation.allowed
+            ? { ok: true }
+            : { message: "capability_denied", capability: operation.capability }, context);
+        }
       }
     }
   });

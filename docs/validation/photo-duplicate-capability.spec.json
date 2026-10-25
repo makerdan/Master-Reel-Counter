@@ -1,0 +1,33 @@
+{
+  "claim": "photo-duplicate-capability-enforcement",
+  "title": "Enforce photo-management capability for photo duplication",
+  "scope": "Fix the account capability middleware in server/routes.ts so only session duplication selects session_create and photo duplication selects photo_management. Preserve session access, edit and lock checks. Add HTTP middleware regression coverage for all four combinations of session_create and photo_management, checking denial payloads and that denied requests cannot reach mutation handlers. No new features or unrelated authorization changes.",
+  "tier": "test-standard",
+  "why": "Backend authorization needs executable HTTP regression tests and compiler checks; the fast tier does not run route tests.",
+  "coverage": "docs/validation/manifest.json test-standard includes typecheck and unit-tests; npm run test:unit executes server/__tests__/routes.test.ts.",
+  "approval": {
+    "reference": "Assigned task 1010 in the active conversation",
+    "direction": "Fix the photo duplication authorization bypass without introducing features",
+    "applicability": "Narrow server middleware repair and regression coverage within the assigned scope"
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {
+      "requirement": "R1 photo duplication",
+      "check": "With session_create true and photo_management false, POST photo duplication returns 403 capability_denied for photo_management without running its mutation handler; all four capability combinations follow photo_management only."
+    },
+    {
+      "requirement": "R2 session duplication",
+      "check": "POST session creation and duplication remain governed by session_create only across all four capability combinations, independently of photo_management."
+    }
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Repairs a server-side authorization bypass permitting unauthorized photo writes.",
+    "covers": "Approved users with edit access and session creation enabled must not bypass a disabled photo-management capability by calling photo duplication.",
+    "testLocation": "server/__tests__/routes.test.ts — account capability route guard, duplication capability matrix",
+    "assertion": "Real HTTP requests through the production middleware return exact 403 photo_management denials before mutation handlers run; permitted photo duplication and session operations follow their own capabilities across all four combinations."
+  }
+}
