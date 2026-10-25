@@ -101,4 +101,9 @@ Before preparing follow-ups, read `.agents/skills/follow-up-tasks/SKILL.md` and
 This customization complements platform guidance; higher-priority rules and live
 callback limits still govern. Never edit `.local` to select it.
 See `AGENTS.md`, `docs/validation/unified-installation.md` and
-`docs/validation/modular-migration.md` for the current runtime acceptance blocker.
+`docs/validation/unified-host-portable-update.md` for current environment-scoped
+readiness. Workspace restart and restore remain unverified, not universal
+admission blockers; explicit owner-selected obligations and dependent safeguards
+remain binding. Main changes do not refresh isolated task copies. Authorized
+handoff needs one executor, preserved records and destination admission. Native
+task-status reconciliation is separate from local completion; no invented API.

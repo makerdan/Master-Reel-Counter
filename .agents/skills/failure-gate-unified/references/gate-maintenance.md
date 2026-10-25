@@ -57,6 +57,14 @@ actually enforces the pin.
 
 ### Updating this skill
 
+Adoption is prospective. Reconcile the complete package with actual project-local
+readiness checks and instructions: distinguish obsolete unconditional host-restart
+prerequisites from still-required persistence/safety controls and explicit owner
+requirements. Remove or revise only the former through owner-authorized maintenance.
+Do not simply toggle readiness or relabel old process probes as workspace acceptance.
+Use supported environment-specific checks and preserve required regression coverage.
+Do not import any other project's task-specific exception.
+
 Replace the canonical skill file as a whole and update the pin in the same
 change. In-flight tasks keep the revision they were sealed under.
 Preserve an exact before snapshot and all historical revision/template/preflight

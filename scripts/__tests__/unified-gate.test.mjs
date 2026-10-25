@@ -9,7 +9,7 @@ import { spawnSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import { emptyRegistry, readRegistry, taskState, pins, hash, TIERS, compareRegistry,
-  mergeGuard, withWriter, validateRegistry, git } from "../lib/unified-gate/store.mjs";
+  mergeGuard, withWriter, validateRegistry, git, environmentAvailability } from "../lib/unified-gate/store.mjs";
 import { provision, amend, guard, restorePlan, cancel, classifyFailure, prepareDraft,
   baselineWarnings } from "../lib/unified-gate/plans.mjs";
 import { run, classificationLog } from "../lib/unified-gate/execution.mjs";
@@ -201,8 +201,84 @@ test("unobserved installation acceptance permits guarded tasks without claiming 
   assert.equal(readFileSync(pinPath, "utf8"), beforePin);
   const status = spawnSync(process.execPath, [join(root, "scripts/unified-gate.mjs"), "status"],
     { cwd: root, encoding: "utf8", timeout: 5000 });
-  assert.equal(status.status, 2);
-  assert.equal(JSON.parse(status.stdout).runtimeAcceptance.state, "NOT_OBSERVED");
+  assert.equal(status.status, 0, status.stderr);
+  const report = JSON.parse(status.stdout);
+  assert.equal(report.status, "CHECKS_AVAILABLE");
+  assert.equal(report.runtimeAcceptance.state, "NOT_OBSERVED");
+  assert.equal(report.executionEnvironment.workspaceRestart, "NOT_OBSERVED");
+  assert.equal(report.executionEnvironment.taskWorker, "NOT_OBSERVED");
+  assert.equal(report.executionEnvironment.restore, "NOT_OBSERVED");
+});
+
+test("claimed acceptance cannot hide missing runner/policy or consume a reservation", async (t) => {
+  const root = fixture(t);
+  modular(root, true); // Deliberately false host-readiness assertion in a fixture.
+  const path = join(root, "scripts/unified-step.mjs");
+  const step = readFileSync(path);
+  const before = readFileSync(join(root, "docs/validation/unified-registry.json"), "utf8");
+  rmSync(path);
+  assert.throws(() => environmentAvailability(root), /required gate runtime file unavailable/);
+  await assert.rejects(provision(root, modularSpec()), /required gate runtime file unavailable/);
+  const report = cli(root, ["status"]);
+  assert.equal(report.status, 2);
+  assert.match(report.stderr, /required gate runtime file unavailable/);
+  assert.equal(readFileSync(join(root, "docs/validation/unified-registry.json"), "utf8"), before);
+  writeFileSync(path, step);
+  installRegression(root);
+  write(root, ".agents/skills/regression-guard/reference/enforcement-contract.md", "damaged required policy");
+  assert.throws(() => environmentAvailability(root), /Regression Guard: core\/reference contract drift/);
+  await assert.rejects(provision(root, modularSpec()), /Regression Guard: core\/reference contract drift/);
+  assert.equal(cli(root, ["status"]).status, 2);
+  assert.equal(readFileSync(join(root, "docs/validation/unified-registry.json"), "utf8"), before);
+});
+
+test("new modular admissions preserve old bindings and task-specific restart obligations", async (t) => {
+  const root = fixture(t);
+  modular(root, false);
+  const previous = JSON.parse(readFileSync(join(project,
+    ".agents/skills/failure-gate-unified/PACKAGE-MANIFEST.json"))).previousNormativeContractSha256;
+  const projectPin = JSON.parse(readFileSync(join(project, "docs/validation/unified-pin.json")));
+  const previousDirectory = projectPin.revisions[previous].directory;
+  cpSync(join(project, previousDirectory), join(root, previousDirectory), { recursive: true });
+  cpSync(join(project, previousDirectory),
+    join(root, ".agents/skills/failure-gate-unified"), { recursive: true });
+  const fixturePin = JSON.parse(readFileSync(join(root, "docs/validation/unified-pin.json")));
+  fixturePin.current = previous;
+  fixturePin.revisions[previous] = { kind: "normative-package", directory: previousDirectory };
+  write(root, "docs/validation/unified-pin.json", fixturePin);
+  const input = { ...modularSpec(), claim: "prior-modular-scope" };
+  input.scope += " Owner-selected workspace restart acceptance remains required for this fixture task.";
+  const old = await provision(root, input);
+  const before = JSON.stringify(readRegistry(root).tasks[old.id]);
+  modular(root, false);
+  const next = await provision(root, modularSpec());
+  assert.notEqual(next.pin, old.pin);
+  assert.equal(guard(root, ctx(old)).pin, old.pin);
+  assert.equal(JSON.stringify(readRegistry(root).tasks[old.id]), before);
+  assert.match(readFileSync(join(root, old.planPath), "utf8"), /Owner-selected workspace restart acceptance remains required/);
+  assert.equal(cli(root, ["guard", "--id", next.id, "--tier", next.tier], old).status, 2);
+  assert.equal(readRegistry(root).tasks[old.id].history.at(-1).state.runs.length, 0);
+});
+
+test("fresh child processes recover a modular fixture without claiming a host restart", async (t) => {
+  const root = fixture(t);
+  modular(root, false);
+  const input = modularSpec();
+  const state = await provision(root, input);
+  const plan = readFileSync(join(root, state.planPath), "utf8");
+  rmSync(join(root, state.planPath));
+  assert.equal(cli(root, ["restore-plan", "--id", state.id]).status, 0);
+  assert.equal(readFileSync(join(root, state.planPath), "utf8"), plan);
+  assert.equal(cli(root, ["guard", "--tier", state.tier], state).status, 0);
+  const result = cli(root, ["run", "--tier", state.tier], state);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(current(root, state.id).runs.at(-1).state, "PASS");
+  assert.equal((await provision(root, input)).id, state.id);
+  assert.equal(readRegistry(root).tombstones.length, 1);
+  const report = JSON.parse(cli(root, ["status"]).stdout);
+  assert.equal(report.runtimeAcceptance.state, "NOT_OBSERVED");
+  assert.equal(report.executionEnvironment.workspaceRestart, "NOT_OBSERVED");
+  assert.equal(report.executionEnvironment.restore, "NOT_OBSERVED");
 });
 test("full modular pin detects core, each reference, and snapshot tampering; historical seals are unchanged", async (t) => {
   const root = fixture(t);
@@ -418,7 +494,7 @@ test("current-pin mismatch stops all operations; old sealed revisions survive le
   assert.throws(() => guard(root, ctx(state)), /historical/);
 });
 
-test("fresh process and independent task-environment copy restore the same sealed plan without machine receipts", async (t) => {
+test("fresh process and simulated filesystem restore preserve a fixture without machine receipts", async (t) => {
   const root = fixture(t), state = await provision(root, spec());
   assert.equal(cli(root, ["guard", "--tier", state.tier], state).status, 0);
   const other = fixture(t);

@@ -153,11 +153,53 @@ run, including isolated task environments when the host uses them.
   does not require is not weakening the gate. Never remove the contract's
   guarantees: unique IDs, single-tier binding, sealed and guarded plans,
   wrong-tier rejection, bounded execution and honest reporting.
-- Before calling an installation ready, confirm the provisioner, plan guards
-  and bound-tier runner work where ordinary tasks run and after a normal
-  workspace restart. Use bounded fixtures or non-destructive probes; do not
-  reboot a live host, restore live resources or provision infrastructure to
-  prove it. A single-session PASS alone is not proof.
+- Establish readiness for the actual execution environment, not every possible
+  host lifecycle. Confirm the provisioner, plan guards and bound-tier runner work
+  there through bounded maintenance fixtures or non-destructive probes.
+  Demonstrate durable identity/plan preservation and safe continuation across
+  supported lifecycle boundaries relevant to that environment. Fresh processes,
+  task-worker execution, workspace restart and restore are distinct observations;
+  label which was checked. Source-only or simulated checks do not establish
+  actual host behavior, and a single-session PASS does not prove restart safety.
+- A workspace restart/resume observation is not a universal admission prerequisite
+  when the host exposes no supported, non-disruptive way to obtain it. Record it
+  as unverified, not passed. Its absence alone does not block ordinary admission
+  when the applicable contract guarantees and actual execution-environment checks
+  are supported. If a required guarantee depends on an unverified boundary, block
+  that dependent operation or use a supported alternative that preserves it.
+  Do not reboot a live host, restore live resources or add infrastructure merely
+  to obtain an observation. Explicit owner-selected restart acceptance requirements
+  remain binding until specifically amended; do not silently waive them.
+
+### Stale task environments and execution handoff
+
+Main-workspace repairs do not prove an already-running isolated task received
+them. Check the execution environment's complete runner, selected contract,
+policy and required dependency outputs before admission. A readiness Boolean
+alone or native dependency status is insufficient. Use supported synchronization
+where available; never invent a main-to-task refresh operation.
+
+If synchronization is unavailable, an owner-authorized handoff may execute the
+same approved scope in a current supported environment. Establish one executor:
+use actual supported status/control evidence or explicit owner confirmation that
+the prior executor will remain idle. BLOCKED alone does not establish quiescence.
+Preserve its work and records; do not auto-cancel, merge stale files or create a
+replacement task merely to move execution.
+
+Reconcile accessible admissions, reservations, uncertain writes and shared-state
+ownership before retry. Native references are associations, not local Gate IDs.
+Do not copy an isolated ledger over another, reset identities or silently rebind
+existing seals. Use the destination's supported admission/transfer route and actual
+namespace; retain links to known prior records. A missing handoff document alone
+need not block an owner-authorized handoff when scope is available, the prior
+executor remains idle and no unresolved safety dependency requires that document.
+Disclose inaccessible state; absence in main is not proof of absence elsewhere.
+Unknown ownership or potentially conflicting operations still require resolution.
+
+Location changes do not waive scope, admission, tier or validation requirements.
+Record the execution location and any actual scope-specific exception. An exception
+for one task never automatically authorizes another. Report an unavailable transfer
+capability precisely rather than requiring another general approval ceremony.
 
 ## Installing, updating and repairing the gate
 
@@ -365,6 +407,19 @@ configuration or target changes does not automatically validate the current
 work. Reuse unaffected evidence when its applicability is supported; rerun
 affected required checks and disclose remaining gaps. Do not impose arbitrary
 expiry, a universal fingerprint format or blanket full-suite retesting.
+
+### Local completion and native task status
+
+Report local gate assessment, implementation delivery and native task-board status
+separately. Supported completion in an authorized destination can satisfy the same
+task's scope without rerunning implementation in its stale isolated environment.
+Native status reconciliation reads the actual delivery and bound validation evidence;
+it is not new application execution or another live admission. Use only supported
+Agent-native task interfaces with applicable authority, never project-code proxies.
+If unavailable, report the precise remaining task-board action without claiming a
+status change. Do not fabricate completion, duplicate the task or resume the old
+executor just to update a label. Relevant changed inputs still require applicable
+revalidation; reconciliation alone does not invalidate sound existing evidence.
 
 ### Owner-directed administrative closure
 

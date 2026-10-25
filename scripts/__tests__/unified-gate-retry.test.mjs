@@ -41,7 +41,7 @@ async function fixture(t, { command = ["node", "--test", "a.test.mjs", "b.test.m
   write(root, "b.test.mjs", `import test from 'node:test'; import fs from 'node:fs';
     test('other file',()=>fs.appendFileSync('.local/markers','other\\n'));`);
   cpSync(join(project, "scripts/lib"), join(root, "scripts/lib"), { recursive: true });
-  for (const file of ["unified-gate.mjs", "unified-step.mjs", "run-typechecked-playwright.mjs"]) {
+  for (const file of ["unified-gate.mjs", "unified-step.mjs", "run-tier.mjs", "run-typechecked-playwright.mjs"]) {
     cpSync(join(project, "scripts", file), join(root, "scripts", file));
   }
   symlinkSync(join(project, "node_modules"), join(root, "node_modules"), "dir");

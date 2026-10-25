@@ -72,7 +72,49 @@ export function admissionReady(root) {
   // Host installation acceptance is a reporting boundary, not task admission.
   // Keep contract integrity mandatory; callers still enforce provisioning,
   // seals, tier binding, authorization declarations and bounded execution.
-  return pins(root);
+  const pin = pins(root);
+  environmentAvailability(root);
+  return pin;
+}
+
+// Read-only operational probe of THIS checkout/process, not a host identity,
+// readiness waiver, native authorization service or workspace-restart receipt.
+export function environmentAvailability(root) {
+  const policy = pins(root);
+  if (policy.regressionGuard) {
+    invariant(regressionContract(root, safePath) === policy.regressionGuard,
+      "adopted Regression Guard policy mismatch or unavailable");
+  }
+  const files = [
+    "scripts/unified-gate.mjs", "scripts/unified-step.mjs", "scripts/run-tier.mjs",
+    "scripts/lib/baseline.mjs", "scripts/lib/tiers.mjs", "scripts/lib/owned-process-group.mjs",
+    ...["store", "contract", "plans", "execution", "regression", "retry",
+      "retry-dispatch", "retry-node-reporter", "retry-browser-reporter", "summaries"]
+      .map((name) => `scripts/lib/unified-gate/${name}.mjs`),
+  ].map((path) => {
+    const file = safePath(root, path);
+    invariant(existsSync(file) && lstatSync(file).isFile(),
+      `required gate runtime file unavailable: ${path}`);
+    return { path, sha256: hash(readFileSync(file)) };
+  });
+  // Exercise the native dependency output, not just require.resolve(). No local
+  // lock/ledger is opened; in-memory connection is always closed.
+  const db = new Database(":memory:");
+  try {
+    invariant(db.prepare("SELECT 1 AS available").get().available === 1,
+      "gate SQLite dependency probe failed");
+  } finally { db.close(); }
+  const gitProbe = git(root, ["--version"]);
+  return {
+    status: "CHECKS_AVAILABLE",
+    scope: "this checkout and current process only; not task admission or lifecycle acceptance",
+    selectedContract: policy.current,
+    adoptedRegressionGuard: policy.regressionGuard ?? null,
+    runnerFiles: files,
+    dependencies: { node: process.version, sqlite: "in-memory query succeeded",
+      git: gitProbe.stdout.trim() },
+    workspaceRestart: "NOT_OBSERVED", taskWorker: "NOT_OBSERVED", restore: "NOT_OBSERVED",
+  };
 }
 export function tierDefinition(root, tier) {
   invariant(TIERS.includes(tier), "unregistered tier");

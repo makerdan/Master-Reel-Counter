@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "regressionGuard": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+  "source": ".agents/skills/failure-gate-unified/SKILL.md",
+  "current": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+  "acceptance": {
+    "state": "NOT_OBSERVED",
+    "reason": "Ordinary isolated task-environment and normal workspace-restart acceptance have not been observed. Installation readiness is unverified; otherwise-valid task admission is independent of this reporting state. Historical contracts are preserved."
+  },
+  "revisions": {
+    "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c": {
+      "kind": "normative-package",
+      "directory": "docs/validation/unified-revisions/cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c"
+    },
+    "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22": "docs/validation/unified-revisions/2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22.txt",
+    "3cc2ed109bed775e188dd4b3db0e17834fd07ef013b03e682de5079d0ae7e937": "docs/validation/unified-revisions/3cc2ed109bed775e188dd4b3db0e17834fd07ef013b03e682de5079d0ae7e937.txt"
+  }
+}

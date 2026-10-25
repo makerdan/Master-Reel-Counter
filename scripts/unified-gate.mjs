@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { invariant, pins, readRegistry, taskState, tierDefinition, TIERS, mergeGuard, git } from "./lib/unified-gate/store.mjs";
+import { invariant, pins, readRegistry, taskState, tierDefinition, TIERS, mergeGuard, git, environmentAvailability } from "./lib/unified-gate/store.mjs";
 import { provision, amend, guard, restorePlan, cancel, catalog, baselineWarnings, prepareDraft } from "./lib/unified-gate/plans.mjs";
 import { run, classificationLog } from "./lib/unified-gate/execution.mjs";
 import { parseInput } from "./lib/unified-gate/regression.mjs";
@@ -93,8 +93,11 @@ try {
           catch (error) { historicalBlockers.push({ id: state.id, reason: error.message }); }
         }
       }
-      result = { status: historicalBlockers.length || (pin.schemaVersion === 2 && pin.acceptance?.state !== "OBSERVED") ? "BLOCKED" : "READY",
+      const executionEnvironment = environmentAvailability(root);
+      result = { status: historicalBlockers.length ? "BLOCKED" : "CHECKS_AVAILABLE",
         historicalBlockers,
+        executionEnvironment,
+        historicalBlockerScope: "listed tasks only; not a waiver or universal denial of unrelated admission",
         runtimeAcceptance: pin.acceptance ?? "historical single-file contract",
         nativeAuthorizationObservation: "NOT_OBSERVED",
         check: "gate setup status, not a tier PASS", pin: pin.current,

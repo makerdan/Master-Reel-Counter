@@ -62,12 +62,27 @@ Gate work requires authentic owner direction and is checked as setup/maintenance
 not a tier PASS. Run `npm run gate:merge-guard` before merges and publication.
 
 See `docs/validation/unified-installation.md` for supported commands and boundaries.
-See `docs/validation/modular-migration.md` for current readiness and rollback.
-Installation readiness remains unverified until ordinary task-environment and
-normal workspace-restart acceptance is actually observed. That reporting state
-does not deny otherwise-valid task admission. Do not fake acceptance or bypass
-contract integrity, sealed-plan guards, single-tier binding or bounded execution.
+See `docs/validation/unified-host-portable-update.md` for current scoped readiness
+and rollback; `modular-migration.md` retains its historical installation evidence.
+Check the actual executing checkout's full contract, runner, policy and dependency
+outputs; `gate:status` reports local availability, not admission or host acceptance.
+Fresh process, isolated task-worker, workspace restart and restore are distinct
+observations. Unavailable non-disruptive workspace-restart capability alone does
+not universally deny admission. Keep dependent safety prerequisites and explicit
+owner-selected restart obligations until specifically amended. Do not fake
+acceptance or bypass contract integrity, sealed plans, binding or bounded execution.
 Historical single-file records retain their original handlers.
+
+Main edits do not synchronize running task copies. Inspect their actual files and
+dependencies before execution; no supported refresh is assumed. Execution handoff
+requires owner authorization, one confirmed-idle prior executor, unchanged approved
+scope and destination admission/reconciliation of accessible reservations and locks.
+BLOCKED status alone is not proof of quiescence. No automatic relocation, ledger
+copy/reset, duplicate task or silent rebinding. Missing transfer capabilities and
+inaccessible state block only dependent work, not unrelated maintenance.
+Local delivery, bound validation and native task status are separate. Reconcile a
+label only through supported native interfaces with authority; never rerun stale
+implementation or invent an API solely to change the label.
 
 ## Follow-up task guidance
 
