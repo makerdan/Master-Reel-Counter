@@ -273,6 +273,50 @@ import express from "express"
 import multer from "multer";
 import { createApiErrorHandler } from "../middlewares/apiErrorHandler.js";
 
+describe("patched Express parser HTTP compatibility", () => {
+  test("JSON, form limits, safe errors and multipart bypass remain intact", { timeout: 10_000 }, async () => {
+    const app = express();
+    app.use(express.json({ limit: 128 }));
+    app.use(express.urlencoded({ extended: false, limit: 128 }));
+    app.post("/", (req, res) => {
+      if (req.is("multipart/form-data")) {
+        assert.equal(req.body, undefined);
+        let raw = "";
+        req.on("data", chunk => { raw += chunk; });
+        req.on("end", () => res.json({ raw }));
+      } else res.json(req.body);
+    });
+    app.use(createApiErrorHandler(() => {}));
+    const server = http.createServer(app);
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as { port: number };
+    async function post(body: string, type: string) {
+      const response = await fetch(`http://127.0.0.1:${port}/`, {
+        method: "POST", headers: { "content-type": type }, body,
+        signal: AbortSignal.timeout(2_000),
+      });
+      return { status: response.status, body: await response.json() };
+    }
+    try {
+      assert.deepEqual(await post('{"ok":true}', "application/json"), { status: 200, body: { ok: true } });
+      assert.deepEqual(await post("a=hello", "application/x-www-form-urlencoded"), { status: 200, body: { a: "hello" } });
+      assert.deepEqual(await post('{"private":', "application/json"), {
+        status: 400, body: { message: "Invalid JSON request body." },
+      });
+      for (const type of ["application/json", "application/x-www-form-urlencoded"]) {
+        const result = await post("x".repeat(129), type);
+        assert.equal(result.status, 413);
+        assert.equal(JSON.stringify(result.body).includes("xxx"), false);
+      }
+      const multipart = "--fixture\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--fixture--\r\n";
+      assert.deepEqual(await post(multipart, "multipart/form-data; boundary=fixture"), { status: 200, body: { raw: multipart } });
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+});
+
 import helmet from "helmet"
 ;
 

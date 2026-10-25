@@ -15,6 +15,7 @@ const proxyRequire = createRequire(
 );
 const limiterRequire = createRequire(require.resolve("express-rate-limit"));
 const consumers = [
+  { name: "body-parser", minimum: "2.4.0", consumer: expressRequire },
   { name: "proxy-addr", minimum: "2.0.8", consumer: expressRequire },
   { name: "follow-redirects", minimum: "1.16.1", consumer: proxyRequire },
   { name: "ip-address", minimum: "10.7.4", consumer: limiterRequire },
@@ -66,6 +67,76 @@ async function close(server: http.Server) {
 }
 
 describe("consumer-resolved network dependency security", { timeout: 20_000 }, () => {
+  test("each installed Express copy resolves a patched body parser", () => {
+    const lock = JSON.parse(readFileSync(new URL("../../package-lock.json", import.meta.url), "utf8"));
+    for (const path of Object.keys(lock.packages).filter(path => /(^|\/)node_modules\/express$/.test(path))) {
+      const consumer = createRequire(new URL(`../../${path}/index.js`, import.meta.url));
+      assertPatched(packageVersion(consumer.resolve("body-parser"), "body-parser"), "2.4.0");
+    }
+    assert.throws(() => assertPatched("2.3.0", "2.4.0"));
+  });
+
+  test("compressed trailing bytes cannot crash or stall an isolated HTTP server", { timeout: 12_000 }, () => {
+    const script = `
+      const assert = require("node:assert/strict");
+      const http = require("node:http");
+      const zlib = require("node:zlib");
+      const express = require(${JSON.stringify(require.resolve("express"))});
+      const app = express();
+      app.use(express.json({ limit: "20mb" }));
+      app.post("/", (req, res) => res.json(req.body));
+      app.use((err, req, res, next) => res.status(err.status || 500).end("rejected"));
+      const server = http.createServer(app);
+      const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+      async function send(body, encoding, trailing, delayed) {
+        return new Promise((resolve, reject) => {
+          const req = http.request({
+            host: "127.0.0.1", port: server.address().port, path: "/", method: "POST",
+            headers: { "Content-Type": "application/json",
+              ...(encoding ? { "Content-Encoding": encoding } : {}),
+              "Content-Length": body.length + trailing.length }
+          }, res => {
+            let data = "";
+            res.on("data", chunk => data += chunk);
+            res.on("error", reject);
+            res.on("end", () => resolve({ status: res.statusCode, data }));
+          });
+          req.on("error", reject);
+          req.setTimeout(1500, () => req.destroy(new Error("request timeout")));
+          if (delayed) { req.write(body); setTimeout(() => req.end(trailing), 40); }
+          else req.end(Buffer.concat([body, trailing]));
+        });
+      }
+      server.listen(0, "127.0.0.1", async () => {
+        try {
+          const input = Buffer.from('{"a":1}');
+          for (const [encoding, encode] of [
+            ["gzip", zlib.gzipSync], ["deflate", zlib.deflateSync], ["br", zlib.brotliCompressSync]
+          ]) {
+            const good = await send(encode(input), encoding, Buffer.alloc(0), false);
+            assert.equal(good.status, 200);
+            assert.deepEqual(JSON.parse(good.data), { a: 1 });
+            for (const delayed of [false, true]) {
+              const result = await send(encode(input), encoding,
+                Buffer.concat([Buffer.from([0]), Buffer.alloc(100 * 1024, 0x58)]), delayed);
+              assert.ok([200, 400].includes(result.status));
+              await delay(100);
+              const next = await send(input, null, Buffer.alloc(0), false);
+              assert.equal(next.status, 200);
+              assert.deepEqual(JSON.parse(next.data), { a: 1 });
+            }
+          }
+          assert.ok(process.resourceUsage().maxRSS < 256 * 1024, "fixture RSS exceeds 256MiB");
+          server.closeAllConnections();
+          server.close(() => process.stdout.write("survived"));
+        } catch (error) { console.error(error); process.exit(1); }
+      });
+    `;
+    assert.equal(execFileSync(process.execPath, ["--max-old-space-size=96", "-e", script], {
+      timeout: 10_000, killSignal: "SIGKILL", maxBuffer: 8_192, env: {},
+    }).toString(), "survived");
+  });
+
   test("every consumer and installed lockfile copy is patched", () => {
     const lock = JSON.parse(readFileSync(new URL("../../package-lock.json", import.meta.url), "utf8"));
     for (const { name, minimum, consumer } of consumers) {

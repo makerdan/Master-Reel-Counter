@@ -1,0 +1,28 @@
+{
+  "claim": "compressed-request-security-1005",
+  "title": "Prevent compressed requests from exhausting the server",
+  "scope": "Remove GHSA-27r3-jxmh-p828 from Express's installed and locked body-parser resolution using a compatible patched dependency. Preserve JSON, URL-encoded, multipart, body limits, authentication and safe errors. No unrelated dependency updates, audit waivers, production data changes or deployment.",
+  "tier": "test-heavy",
+  "why": "The security audit and browser compatibility checks are required alongside compiler and HTTP regression tests.",
+  "coverage": "docs/validation/manifest.json test-heavy: 900000 ms; security-audit, typecheck, unit-tests including dependency-network-security.test.ts and routes.test.ts, browser-tests through scripts/run-browser-tests.mjs. Invoke gate:run with generated task context.",
+  "approval": {
+    "reference": "Assigned task 1005 in active conversation",
+    "direction": "Repair the compressed request body-parser advisory and implement the specified guards",
+    "applicability": "Compatible dependency repair and regression coverage only"
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {"requirement": "R1 patched resolution", "check": "Every installed and locked Express consumer resolves body-parser >=2.4.0 in major 2; portable locked installation retains the resolution."},
+    {"requirement": "R2 crash resistance", "check": "A finite heap- and time-bounded child receives compressed frames with delayed trailing bytes, survives, handles a subsequent valid request and exits normally."},
+    {"requirement": "R3 parser compatibility", "check": "Real HTTP tests preserve JSON and URL-encoded parsing, reject malformed and oversized bodies, and leave multipart for its own parser. Existing route and browser tests cover authentication and uploads."}
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Security and availability repair at the existing Express parsing boundary.",
+    "covers": "R1 vulnerable body-parser resolution; R2 compressed trailing-byte process crash; R3 parsing compatibility",
+    "testLocation": "server/__tests__/dependency-network-security.test.ts and server/__tests__/routes.test.ts",
+    "assertion": "Assert patched consumer and lockfile versions, bounded successful child exit after delayed compressed trailers and a subsequent request, valid parsing, safe malformed/limit rejection and multipart bypass."
+  }
+}
