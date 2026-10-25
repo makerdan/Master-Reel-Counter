@@ -148,6 +148,190 @@
             "approvalHash": "0580f764307cd8e049cd3eaba50f8ac55bc3cf9576826592f0baacc694b5f1e6"
           },
           "digest": "3d4c2c2547806b0f75029ffd05bb758d5871b71aaaa7ac809e66b87f93c74b93"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-25T04:34:15.200Z",
+          "previous": "3d4c2c2547806b0f75029ffd05bb758d5871b71aaaa7ac809e66b87f93c74b93",
+          "state": {
+            "id": "02401352-2967-439c-afc2-0456d418271a",
+            "createdAt": "2026-10-21T02:24:46.962Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-heavy",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/02401352-2967-439c-afc2-0456d418271a.md",
+            "specHash": "52da1a888ce2796eeabadb941a04a21e971eee230832b39dc699586a279c2e56",
+            "runs": [
+              {
+                "id": "3cd96cc0-c712-4b48-b50e-35b584887340",
+                "taskId": "02401352-2967-439c-afc2-0456d418271a",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-heavy",
+                "planHash": "f3fd63ec1d4567dcbb763258bc91b57341d60e6988e046032d9e79dec2c42534",
+                "workloadHash": "b97e7282b502b201b5dbce053c829127ef14266c924b0389eaf253ecbcd358a5",
+                "target": {
+                  "head": "bd96c42e2bcca99269a50e45cb0de5a5da2b6d39",
+                  "filesHash": "28020811dbc3aee8574673f479857db8dd873bb3ddd26daad7e60ad645a6e9e8"
+                },
+                "startedAt": "2026-10-25T04:34:15.184Z",
+                "cleanupDeadline": "2026-10-25T04:49:18.184Z",
+                "evidencePath": ".local/failure-gate-unified/runs/3cd96cc0-c712-4b48-b50e-35b584887340.jsonl",
+                "observations": [],
+                "reportingContext": {
+                  "runtime": {
+                    "node": "20.20.0",
+                    "platform": "linux",
+                    "arch": "x64",
+                    "osReleaseHash": "a6b296572028c57d95384cdb959ae8591deff94b12bc4840647aff43ca55fbc6",
+                    "dependencyLock": "560703ec37caf7fe9d76316e909348b151efc8d07f06a248ffe76b5978ae69c4",
+                    "implementation": "cc1721d601fda42cb17be538d3eefde9122c2dc2b762dfecf9eb079282dee890"
+                  },
+                  "dirty": true,
+                  "steps": [
+                    {
+                      "key": "8d3c56ae9ea98da4c99da102aaca45f9fffc715697b41bfb0f7a8a6f932b84bd",
+                      "label": "startup-smoke",
+                      "kind": "smoke"
+                    },
+                    {
+                      "key": "e009146b5ade3fb4f7fcad595cff8f962c8bdab3a9c750ecf36948f046af6c7a",
+                      "label": "startup-smoke-boundaries",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "b2e4484c9dcd32d212b445e9675d87a33948c5d630f39d6d71532825913243c7",
+                      "label": "security-audit",
+                      "kind": "audit"
+                    },
+                    {
+                      "key": "44c226493c9d2c03c65da671243718b773b381c03365dac486f06ea90de85f67",
+                      "label": "schema-check",
+                      "kind": "lint"
+                    },
+                    {
+                      "key": "b3c044fc075121e59a4233b62d4ff29965117e60be42d51c397b1fc0e81a265a",
+                      "label": "release-schema-contract",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "8d9dd27384f3173d85889dfb78e6f2e07bf6c6f5de12bdcb744d13e15ab8d3ed",
+                      "label": "workspace-skill-contract",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "5d8c1964c9fd4dd593cf395bc7476a089513e04417f7c0444b233cf435a12ec1",
+                      "label": "typecheck",
+                      "kind": "typecheck"
+                    },
+                    {
+                      "key": "0cc5546a3aae3b6c3563e7b3b51288a10c8971e615bf26ff0551982e2a3bac21",
+                      "label": "storage-lint",
+                      "kind": "lint"
+                    },
+                    {
+                      "key": "da13194e56bc165baf479603202d7aa37fa9483c4b9da1a3ad06b439148d87c9",
+                      "label": "port-reference-scan",
+                      "kind": "lint"
+                    },
+                    {
+                      "key": "2dba86009fd5b923e3f6aeb33161341e139edb5a0d09f6e281948f6670fcbab0",
+                      "label": "storage-lint-contract",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "1b99f51362a5bec7ed03a2813c301852b1f3e42083091c56f4e48c83bfb68bf4",
+                      "label": "unit-tests",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "23d852c0f17be351c82025af260e1c7489feff19c516379a68e99b8854301f72",
+                      "label": "vite-hmr-tests",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "d862c8bc262f6d6746b449a7eb73c261ceee5d304e024a5e158f8f15a54a7e45",
+                      "label": "vite-hmr-recovery-tests",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "64eabfb9b4c9bde905051927c106fdedf8b60daec235c38e525d8edb6c7ee6b1",
+                      "label": "serial-lock-tests",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "b04f93e7295126cb074ef3c97e0774ae23650266c491f126a5669753958caa59",
+                      "label": "port-authority-tests",
+                      "kind": "harness"
+                    },
+                    {
+                      "key": "c0e0ff629cffb328286fb87915379fb5bdd72e3974ab6c9460cce8319c06b7a8",
+                      "label": "manifest-parity",
+                      "kind": "lint"
+                    },
+                    {
+                      "key": "17d0a01270b1910185d2eea11d3f9f0dc1d2468dd6f9e6990a0aea450963fa79",
+                      "label": "nested-tier-regression",
+                      "kind": "test"
+                    },
+                    {
+                      "key": "c179b47e984a16c29c06143410632f2d8c65362436c6fd18f86a08a15885c827",
+                      "label": "collision-smoke",
+                      "kind": "smoke"
+                    },
+                    {
+                      "key": "a6882f2b81c703f8546a0f08dde5332428d9fef524d76f681cd0031eb02aa338",
+                      "label": "browser-tests",
+                      "kind": "test"
+                    }
+                  ],
+                  "omittedSteps": 0
+                }
+              }
+            ],
+            "spec": {
+              "title": "Fix the mobile photo handoff test's generated filename assertion",
+              "scope": "Change only tests/mobile-photo-upload.spec.ts, case 'hands a captured photo to Photos Reel and reloads its protected image @mobile-image-orientation'. Derive expectedFilename as `S${session.id}_P${String(registered.id).padStart(4, \"0\")}.jpg` after receiving the created photo ID. The source file remains handoff.jpg; .jpg is its registration extension. Assert the persisted originalFilename equals this exact generated display filename, not the source name, a regex, or a value copied from the response under test. The physical object path remains upload.objectPath returned by /api/uploads/direct: do not rename it or derive it from the display filename. Preserve the backend contract in server/storage.ts atomicCreatePhoto and extension extraction in server/routes.ts. Preserve all other existing metadata and journey assertions, with no early returns, skips, weakened matching, altered fixtures, or auth changes. Require one successful direct upload and registration, registered.objectStorageKey === upload.objectPath, one persisted photo with registered.id, width 37, height 23, aisle B, section 007, and the exact expectedFilename. Complete the Photos Reel journey: active strip tab, visible photo card and thumbnail, src exactly upload.objectPath, successful protected GET to that path, decoded natural dimensions 37x23, and exactly one strip card. Reload, reopen Photos Reel through the existing phone navigation, and require a new successful protected GET and the same decoded image dimensions. Re-read the API and require equality with the complete pre-reload photo array, one persisted row, the same generated filename and metadata, and an empty offline queue. Confirm uploadResponses and registrationResponses still each contain exactly one response after reload, so duplicate registration attempts cannot be hidden by idempotent persistence. Execute all downstream image/reload assertions; currently they are unverified because the filename mismatch stops this case. This repair is independent of sign-in activation work; do not repair auth failures here. Out of scope: production changes, backend naming, storage layout, upload-security changes, gate maintenance, deployment, and separate independent verification. Any material production change requires scope reassessment and supported amendment before implementation.\n\n## Regression Guard\n**Self-satisfying** — Entire implementation scope is the test correction in tests/mobile-photo-upload.spec.ts, case 'hands a captured photo to Photos Reel and reloads its protected image': assert the exact generated filename for the returned session/photo IDs, unchanged uploaded object path, dimensions and location, one persisted photo, no duplicate upload/registration responses after reload, and successful protected-thumbnail decoding before and after reload. No separate material behavior change is included. This declaration describes planned coverage, not delivered or passing coverage.",
+              "tier": "test-heavy",
+              "why": "Only the registered heavy tier includes browser-tests for the phone handoff and reload journey; its typecheck step compiler-checks the revised browser test.",
+              "coverage": "docs/validation/manifest.json tiers.test-heavy: preserve all 19 registered steps and the 900000 ms budget, including typecheck (npm run typecheck) and browser-tests (node scripts/run-browser-tests.mjs). playwright.config.ts selects this @mobile-image-orientation case in mobile-chromium (Pixel 5) and mobile-webkit (iPhone 13) when CI=true or PLAYWRIGHT_WEBKIT_ENABLED=true; scripts/lib/browser-project-coverage.mjs reports the actual supported matrix. Preserve desktop and all enabled mobile projects, default case selection, auth fixtures, and isolated browser database setup. Local heavy without WebKit is partial browser-matrix coverage, not proof of iPhone coverage. WebKit runtime availability on this Nix host has not been tested in preparation; use the existing supported CI environment for that project when required and report any blocker, without changing tiers, browser flags, workloads, or claiming a skipped project passed. Filtered diagnostics may use the documented bound-tier --step browser-tests route but cannot establish full-tier PASS. Before editing run TASK_ID and TASK_PLAN_FILE with npm run gate:guard -- --tier test-heavy; validate implementation through the complete bound-tier gate:run route, not a direct Playwright bypass.",
+              "approval": {
+                "reference": "Owner-assigned Prepare Photo Assertion Repair, active task description and .local/tasks/task-951.md, What & Why, Steps 1-3, and Regression Guard.",
+                "direction": "Prepare and register a separate repair plan for the mobile photo test's filename mismatch; preserve atomic registration's generated backend filename; keep this task independent of the sign-in repair. The assignment carries the owner's fix request and split instruction, expressly requiring normal Build-mode provisioning and a passing plan guard before publication or implementation.",
+                "applicability": "This sealed revision covers only the narrowly specified photo-test correction and its unchanged full heavy-tier validation. The active assignment authorizes preparing and sealing this plan, not executing it during preparation. Subsequent implementation dispatch must identify this exact sealed revision and verify the applicable owner authorization; native Start alone does not approve materially changed scope. No original receipt, reviewer click, separate verification, application change, or test PASS is asserted by this preparation."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1: Preserve the exact generated display filename contract",
+                  "check": "In tests/mobile-photo-upload.spec.ts handoff case, compute `S${session.id}_P${String(registered.id).padStart(4, \"0\")}.jpg` from the newly created IDs and the source .jpg extension; assert exact persisted originalFilename before reload and through equal API state afterward. Do not compare against handoff.jpg or derive the expectation from persisted originalFilename."
+                },
+                {
+                  "requirement": "R2: Preserve upload identity, metadata, and exactly-once handoff",
+                  "check": "Retain one successful direct upload and registration, same upload.objectPath in the registration and persisted photo, exactly one row with registered.id, 37x23 dimensions, aisle B and section 007. After reload require unchanged API array and still exactly one upload response and one registration response, plus an empty offline queue."
+                },
+                {
+                  "requirement": "R3: Reach and pass real protected-image decoding before and after reload",
+                  "check": "Run existing assertReelImage both before and after reload: active strip tab, visible registered-id card/thumbnail, src equal to upload.objectPath, complete true with naturalWidth 37 and naturalHeight 23, an increased successful protected GET count for that exact path on each phase, and exactly one strip card. No skip, early exit, or softened assertion may bypass the previously unreached checks."
+                },
+                {
+                  "requirement": "R4: Preserve authorized validation and report remaining gaps honestly",
+                  "check": "Run the full registered test-heavy through the sealed plan's supported gate context after implementation, including typecheck and browser-tests, retaining supported mobile-chromium and mobile-webkit coverage. Record actual project coverage and any unreached assertions or environment/auth blockers as unverified; filtered diagnostics, retries, and local Chromium-only results do not prove a full-matrix or full-tier pass. Catalog is valid and empty at preparation: no baseline waivers; the filename mismatch is owned repair scope, not an ignored failure."
+                }
+              ]
+            },
+            "workloadHash": "b97e7282b502b201b5dbce053c829127ef14266c924b0389eaf253ecbcd358a5",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Fix the mobile photo handoff test's generated filename assertion\n\n## Task identity\n**Task ID:** 02401352-2967-439c-afc2-0456d418271a\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nChange only tests/mobile-photo-upload.spec.ts, case 'hands a captured photo to Photos Reel and reloads its protected image @mobile-image-orientation'. Derive expectedFilename as `S${session.id}_P${String(registered.id).padStart(4, \"0\")}.jpg` after receiving the created photo ID. The source file remains handoff.jpg; .jpg is its registration extension. Assert the persisted originalFilename equals this exact generated display filename, not the source name, a regex, or a value copied from the response under test. The physical object path remains upload.objectPath returned by /api/uploads/direct: do not rename it or derive it from the display filename. Preserve the backend contract in server/storage.ts atomicCreatePhoto and extension extraction in server/routes.ts. Preserve all other existing metadata and journey assertions, with no early returns, skips, weakened matching, altered fixtures, or auth changes. Require one successful direct upload and registration, registered.objectStorageKey === upload.objectPath, one persisted photo with registered.id, width 37, height 23, aisle B, section 007, and the exact expectedFilename. Complete the Photos Reel journey: active strip tab, visible photo card and thumbnail, src exactly upload.objectPath, successful protected GET to that path, decoded natural dimensions 37x23, and exactly one strip card. Reload, reopen Photos Reel through the existing phone navigation, and require a new successful protected GET and the same decoded image dimensions. Re-read the API and require equality with the complete pre-reload photo array, one persisted row, the same generated filename and metadata, and an empty offline queue. Confirm uploadResponses and registrationResponses still each contain exactly one response after reload, so duplicate registration attempts cannot be hidden by idempotent persistence. Execute all downstream image/reload assertions; currently they are unverified because the filename mismatch stops this case. This repair is independent of sign-in activation work; do not repair auth failures here. Out of scope: production changes, backend naming, storage layout, upload-security changes, gate maintenance, deployment, and separate independent verification. Any material production change requires scope reassessment and supported amendment before implementation.\n\n## Regression Guard\n**Self-satisfying** — Entire implementation scope is the test correction in tests/mobile-photo-upload.spec.ts, case 'hands a captured photo to Photos Reel and reloads its protected image': assert the exact generated filename for the returned session/photo IDs, unchanged uploaded object path, dimensions and location, one persisted photo, no duplicate upload/registration responses after reload, and successful protected-thumbnail decoding before and after reload. No separate material behavior change is included. This declaration describes planned coverage, not delivered or passing coverage.\n\n## Approval evidence\n**Reference:** Owner-assigned Prepare Photo Assertion Repair, active task description and .local/tasks/task-951.md, What & Why, Steps 1-3, and Regression Guard.\n**Owner direction:** Prepare and register a separate repair plan for the mobile photo test's filename mismatch; preserve atomic registration's generated backend filename; keep this task independent of the sign-in repair. The assignment carries the owner's fix request and split instruction, expressly requiring normal Build-mode provisioning and a passing plan guard before publication or implementation.\n**Applicability:** This sealed revision covers only the narrowly specified photo-test correction and its unchanged full heavy-tier validation. The active assignment authorizes preparing and sealing this plan, not executing it during preparation. Subsequent implementation dispatch must identify this exact sealed revision and verify the applicable owner authorization; native Start alone does not approve materially changed scope. No original receipt, reviewer click, separate verification, application change, or test PASS is asserted by this preparation.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-heavy`\n**Why:** Only the registered heavy tier includes browser-tests for the phone handoff and reload journey; its typecheck step compiler-checks the revised browser test.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json tiers.test-heavy: preserve all 19 registered steps and the 900000 ms budget, including typecheck (npm run typecheck) and browser-tests (node scripts/run-browser-tests.mjs). playwright.config.ts selects this @mobile-image-orientation case in mobile-chromium (Pixel 5) and mobile-webkit (iPhone 13) when CI=true or PLAYWRIGHT_WEBKIT_ENABLED=true; scripts/lib/browser-project-coverage.mjs reports the actual supported matrix. Preserve desktop and all enabled mobile projects, default case selection, auth fixtures, and isolated browser database setup. Local heavy without WebKit is partial browser-matrix coverage, not proof of iPhone coverage. WebKit runtime availability on this Nix host has not been tested in preparation; use the existing supported CI environment for that project when required and report any blocker, without changing tiers, browser flags, workloads, or claiming a skipped project passed. Filtered diagnostics may use the documented bound-tier --step browser-tests route but cannot establish full-tier PASS. Before editing run TASK_ID and TASK_PLAN_FILE with npm run gate:guard -- --tier test-heavy; validate implementation through the complete bound-tier gate:run route, not a direct Playwright bypass.; supported invocation: TASK_ID=02401352-2967-439c-afc2-0456d418271a TASK_PLAN_FILE=.local/tasks/02401352-2967-439c-afc2-0456d418271a.md npm run gate:run -- --id 02401352-2967-439c-afc2-0456d418271a --tier test-heavy\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1: Preserve the exact generated display filename contract — In tests/mobile-photo-upload.spec.ts handoff case, compute `S${session.id}_P${String(registered.id).padStart(4, \"0\")}.jpg` from the newly created IDs and the source .jpg extension; assert exact persisted originalFilename before reload and through equal API state afterward. Do not compare against handoff.jpg or derive the expectation from persisted originalFilename.\n- R2: Preserve upload identity, metadata, and exactly-once handoff — Retain one successful direct upload and registration, same upload.objectPath in the registration and persisted photo, exactly one row with registered.id, 37x23 dimensions, aisle B and section 007. After reload require unchanged API array and still exactly one upload response and one registration response, plus an empty offline queue.\n- R3: Reach and pass real protected-image decoding before and after reload — Run existing assertReelImage both before and after reload: active strip tab, visible registered-id card/thumbnail, src equal to upload.objectPath, complete true with naturalWidth 37 and naturalHeight 23, an increased successful protected GET count for that exact path on each phase, and exactly one strip card. No skip, early exit, or softened assertion may bypass the previously unreached checks.\n- R4: Preserve authorized validation and report remaining gaps honestly — Run the full registered test-heavy through the sealed plan's supported gate context after implementation, including typecheck and browser-tests, retaining supported mobile-chromium and mobile-webkit coverage. Record actual project coverage and any unreached assertions or environment/auth blockers as unverified; filtered diagnostics, retries, and local Chromium-only results do not prove a full-matrix or full-tier pass. Catalog is valid and empty at preparation: no baseline waivers; the filename mismatch is owned repair scope, not an ignored failure.\n",
+            "planHash": "f3fd63ec1d4567dcbb763258bc91b57341d60e6988e046032d9e79dec2c42534",
+            "approvalHash": "0580f764307cd8e049cd3eaba50f8ac55bc3cf9576826592f0baacc694b5f1e6"
+          },
+          "digest": "9ec516bf58e6ebe9e7a139339b88aa8aef4cf1f141cf3baee0a4f25592538e95"
         }
       ]
     },

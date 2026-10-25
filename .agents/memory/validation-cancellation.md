@@ -15,3 +15,8 @@ correctly refused further validation until its original cleanup deadline.
 is necessary, preserve its evidence, verify owned processes have stopped, and
 respect the recorder's supported recovery conditions rather than editing state
 or shortening its deadline.
+
+Foreground shell-tool timeouts can leave the same unresolved record. For a
+validation budget longer than the tool's foreground timeout, use a managed
+background shell and observe completion rather than letting the outer call
+terminate the recorder early.

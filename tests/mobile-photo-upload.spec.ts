@@ -362,6 +362,7 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
     const registered = await registrationResponses[0].json() as { id: number; objectStorageKey: string };
     expect(registered.id).toEqual(expect.any(Number));
     expect(registered.objectStorageKey).toBe(upload.objectPath);
+    const expectedFilename = `S${session.id}_P${String(registered.id).padStart(4, "0")}.jpg`;
 
     const readPhotos = async () => {
       const response = await request.get(photoApiPath);
@@ -380,7 +381,7 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
       height: 23,
       aisle: "B",
       section: "007",
-      originalFilename: "handoff.jpg",
+      originalFilename: expectedFilename,
     });
 
     const successfulImageReads = () => imageResponses.filter(response =>
@@ -414,6 +415,8 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
     await assertReelImage(readsBeforeReload);
     expect(await readPhotos()).toEqual(photos);
     expect(await queuedPhotoCount(page)).toBe(0);
+    expect(uploadResponses).toHaveLength(1);
+    expect(registrationResponses).toHaveLength(1);
   });
 
   test("reconciles both queue stores atomically and only recovers current-owner claims", async ({
