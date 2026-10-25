@@ -57,3 +57,4 @@
 - [Validation cancellation](validation-cancellation.md) — stopping a background shell may leave its validation record unresolved; respect the recorded cleanup deadline and recovery route.
 - [Task checkout merge visibility](task-checkout-merge-visibility.md) — merged-task notifications do not prove the assigned checkout includes those fixes; inspect source and lockfile before retrying.
 - [Gate history read errors](gate-history-read-errors.md) — a generic Git show failure can be buffered-output exhaustion, not damaged history; preserve records when diagnosing.
+- [Duplicate managed services](duplicate-managed-services.md) — a named stop can leave another instance alive; verify listeners before restarting.
