@@ -569,6 +569,28 @@ test("owner-direction closure preserves identity/history and cannot become PASS 
   await assert.rejects(amend(root, state.id, spec(), "Cannot reopen fixture"), /quiescent/);
 });
 
+test("large committed and staged registries preserve history beyond the Git stdout buffer", async (t) => {
+  const root = fixture(t);
+  const state = await provision(root, {
+    ...spec(), scope: "Large history setup fixture. " + "x".repeat(4_050_000),
+  });
+  const path = "docs/validation/unified-registry.json";
+  assert.ok(readFileSync(join(root, path)).length > 4_000_000);
+  git(root, ["add", path]);
+  git(root, ["commit", "-qm", "large fixture history"]);
+  const registry = readRegistry(root);
+  mergeGuard(root, registry);
+  mergeGuard(root, registry, true);
+  const missing = structuredClone(registry);
+  delete missing.tasks[state.id];
+  assert.throws(() => mergeGuard(root, missing), /task ID disappeared/);
+  const rewritten = structuredClone(registry);
+  rewritten.tasks[state.id].history[0].state.tier = "test-heavy";
+  write(root, path, rewritten);
+  git(root, ["add", path]);
+  assert.throws(() => mergeGuard(root, registry, true), /changed event chain/);
+});
+
 test("merge guard preserves IDs/tombstones and permits only append-only supported transitions", async (t) => {
   const root = fixture(t), state = await provision(root, spec());
   git(root, ["add", "docs/validation/unified-registry.json"]);

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync, mkdirSync, openSync, writeFileSync,
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, rmSync, openSync, writeFileSync,
   fsyncSync, closeSync, renameSync, lstatSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve, dirname, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
@@ -223,13 +224,28 @@ export function git(root, args, allowedFailure = false, maxBuffer = 32_000_000) 
 }
 function gitRegistry(root, ref) {
   // Resolve once so sizing and reading use the same immutable Git object, even
-  // if HEAD or the index changes. Retained history can outgrow the generic
-  // command-output buffer; its actual blob size supplies the bounded read.
+  // if HEAD or the index changes. Spool this known JSON object rather than
+  // imposing a fixed stdout buffer limit on append-only history.
   const object = git(root, ["rev-parse", "--verify", `${ref}:${REGISTRY}`]).stdout.trim();
   const size = Number(git(root, ["cat-file", "-s", object]).stdout.trim());
   invariant(Number.isSafeInteger(size) && size > 0 && size <= Number.MAX_SAFE_INTEGER - 65536,
     "invalid registry Git object size");
-  return JSON.parse(git(root, ["show", object], false, Math.max(4_000_000, size + 65536)).stdout);
+  // Keep Git's timeout and bounded stderr, and never accept a partial/failed
+  // read as a registry. The private spool is removed even on invalid JSON.
+  const directory = mkdtempSync(resolve(tmpdir(), "unified-registry-read-"));
+  const path = resolve(directory, "registry.json");
+  const fd = openSync(path, "wx", 0o600);
+  try {
+    const result = spawnSync("git", ["show", object], {
+      cwd: root, encoding: "utf8", timeout: 3000, maxBuffer: 4_000_000,
+      stdio: ["ignore", fd, "pipe"],
+    });
+    invariant(result.status === 0, "git prerequisite failed: show");
+    return JSON.parse(readFileSync(path, "utf8"));
+  } finally {
+    closeSync(fd);
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 function committedRegistry(root, ref) {
   const listing = git(root, ["ls-tree", ref, "--", REGISTRY]).stdout.trim();

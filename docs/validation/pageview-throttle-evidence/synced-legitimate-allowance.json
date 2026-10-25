@@ -1,0 +1,4561 @@
+{
+  "schemaVersion": 1,
+  "target": "http://127.0.0.1:44375",
+  "candidate": "pageview-allowance-09a26a3a-cbad-49a6-8fab-fbb7a03d0bfe",
+  "database": "registered wrapper disposable database; distinct from publication",
+  "anonymousState": "empty cookies/origins and no authorization or forwarded identity headers",
+  "transport": "sequential fixed-client APIRequestContext HTTP; redirects disabled",
+  "quietWindowMs": 61000,
+  "sourceHashes": {
+    "server/index.ts": "da7823d52f7460ad27144fdc7e013ad1699e3068bc97be0274724a14a53f7329",
+    "server/routes.ts": "786f6cb5ca2f0e06bb33b0a9d0e2f2ef8e8068a3eaedcf47696f945032b0926f",
+    "server/pageview-tracking.ts": "87098bf60e36b9764e839edeeabf2b4680bf16bcfeedd5f9da1fd668f0eb8430",
+    "tests/pageview-rate-limit.spec.ts": "df54679ca780cf152746bed68c4fce7f6f8d148f8dee9da1405aade273a08bec",
+    "tests/support/pageview-allowance.ts": "c65e60672884221a404f638a05ee6b418974ae8a6003dc4bcd7b3272b5020dd1",
+    "tests/support/pageview-owned-server.ts": "a17e4123de222d79bfd36b25a7a62c871547784d8f24603ae60b67cffad40a30",
+    "scripts/run-browser-tests.mjs": "4f7dba4d562b455832c877b444f622c1a860d8f6403d4355b812b4f4eac70b13"
+  },
+  "initial": {
+    "candidateMatched": true,
+    "listener": {
+      "pid": 22314,
+      "startTicks": "140060"
+    }
+  },
+  "anonymousStatus": 401,
+  "real": {
+    "before": {
+      "candidateMatched": true,
+      "listener": {
+        "pid": 22314,
+        "startTicks": "140060"
+      }
+    },
+    "after": {
+      "candidateMatched": true,
+      "listener": {
+        "pid": 22314,
+        "startTicks": "140060"
+      }
+    },
+    "startedAt": "2026-10-25T03:58:51.490Z",
+    "durationMs": 390.3170880000034,
+    "requests": [
+      {
+        "index": 0,
+        "sentMs": 0.003701000001456123,
+        "receivedMs": 47.376647000004596,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "59",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "absent",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 1,
+        "sentMs": 51.10841900000378,
+        "receivedMs": 59.78735900000174,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "58",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 2,
+        "sentMs": 60.68534799999907,
+        "receivedMs": 67.23533600000519,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "57",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 3,
+        "sentMs": 67.98190299999987,
+        "receivedMs": 72.02232899999944,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "56",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 4,
+        "sentMs": 72.81604399999924,
+        "receivedMs": 76.81037900000229,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "55",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 5,
+        "sentMs": 77.79317200000514,
+        "receivedMs": 85.97495300000446,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "54",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 6,
+        "sentMs": 89.31915500000468,
+        "receivedMs": 97.89199100000405,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "53",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 7,
+        "sentMs": 102.92420000000129,
+        "receivedMs": 113.98114899999928,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "52",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 8,
+        "sentMs": 118.23501200000464,
+        "receivedMs": 123.0064229999989,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "51",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 9,
+        "sentMs": 124.05179900000076,
+        "receivedMs": 128.44224699999904,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "50",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 10,
+        "sentMs": 129.37460500000452,
+        "receivedMs": 132.94219000000157,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "49",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 11,
+        "sentMs": 133.78956599999947,
+        "receivedMs": 137.89197699999932,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "48",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 12,
+        "sentMs": 141.50619800000277,
+        "receivedMs": 146.24926799999957,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "47",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 13,
+        "sentMs": 147.30380900000455,
+        "receivedMs": 150.9877850000048,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "46",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 14,
+        "sentMs": 156.97425400000066,
+        "receivedMs": 161.99758800000563,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "45",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 15,
+        "sentMs": 162.8792390000017,
+        "receivedMs": 167.45717600000353,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "44",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 16,
+        "sentMs": 168.2457859999995,
+        "receivedMs": 172.80860799999937,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "43",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 17,
+        "sentMs": 173.60529400000087,
+        "receivedMs": 178.0248070000016,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "42",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 18,
+        "sentMs": 179.0678990000015,
+        "receivedMs": 183.78968900000473,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "41",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 19,
+        "sentMs": 184.72806200000196,
+        "receivedMs": 188.19236800000363,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "40",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 20,
+        "sentMs": 189.12578500000382,
+        "receivedMs": 192.54049700000178,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "39",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 21,
+        "sentMs": 193.50731900000392,
+        "receivedMs": 197.1371880000006,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "38",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 22,
+        "sentMs": 197.9406020000024,
+        "receivedMs": 202.16233400000056,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "37",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 23,
+        "sentMs": 203.2357919999995,
+        "receivedMs": 206.88090200000443,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "36",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 24,
+        "sentMs": 207.81831500000408,
+        "receivedMs": 211.22005000000354,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "35",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 25,
+        "sentMs": 212.0697130000044,
+        "receivedMs": 217.75535200000013,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "34",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 26,
+        "sentMs": 219.7960180000009,
+        "receivedMs": 224.31171200000244,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "33",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 27,
+        "sentMs": 226.0611080000017,
+        "receivedMs": 231.62097899999935,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "32",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 28,
+        "sentMs": 232.47089500000584,
+        "receivedMs": 235.5466180000003,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "31",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 29,
+        "sentMs": 236.40440200000012,
+        "receivedMs": 239.35357700000168,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "30",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 30,
+        "sentMs": 241.8505570000052,
+        "receivedMs": 244.7056220000013,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "29",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 31,
+        "sentMs": 245.43107800000143,
+        "receivedMs": 248.5575319999989,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "28",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 32,
+        "sentMs": 249.3677880000032,
+        "receivedMs": 252.0071670000034,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "27",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 33,
+        "sentMs": 252.73761699999886,
+        "receivedMs": 255.56105400000524,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "26",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 34,
+        "sentMs": 256.26169700000173,
+        "receivedMs": 259.5275210000036,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "25",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 35,
+        "sentMs": 260.4209120000014,
+        "receivedMs": 264.2567740000013,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "24",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 36,
+        "sentMs": 265.06689200000255,
+        "receivedMs": 268.1888370000015,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "23",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 37,
+        "sentMs": 268.74047400000563,
+        "receivedMs": 271.0526680000039,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "22",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 38,
+        "sentMs": 271.5978680000044,
+        "receivedMs": 273.94387900000584,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "21",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 39,
+        "sentMs": 274.774900000004,
+        "receivedMs": 277.2931559999997,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "20",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 40,
+        "sentMs": 277.7993009999991,
+        "receivedMs": 280.235431000001,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "19",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 41,
+        "sentMs": 280.76852599999984,
+        "receivedMs": 283.2001980000059,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "18",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 42,
+        "sentMs": 283.72010800000135,
+        "receivedMs": 286.8581970000014,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "17",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 43,
+        "sentMs": 288.8011630000037,
+        "receivedMs": 291.2654079999993,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "16",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 44,
+        "sentMs": 291.83075900000404,
+        "receivedMs": 294.2532940000019,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "15",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 45,
+        "sentMs": 294.9525020000001,
+        "receivedMs": 297.71703400000115,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "14",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 46,
+        "sentMs": 298.4011060000048,
+        "receivedMs": 300.9626050000006,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "13",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 47,
+        "sentMs": 301.54559600000357,
+        "receivedMs": 304.19047700000374,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "12",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 48,
+        "sentMs": 304.74282400000084,
+        "receivedMs": 308.2119040000034,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "11",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 49,
+        "sentMs": 308.78660800000216,
+        "receivedMs": 311.76338000000396,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "10",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 50,
+        "sentMs": 312.4447050000017,
+        "receivedMs": 315.6681050000043,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "9",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 51,
+        "sentMs": 316.3015430000014,
+        "receivedMs": 320.4659260000044,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "8",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 52,
+        "sentMs": 321.832957000006,
+        "receivedMs": 326.7749130000011,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "7",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 53,
+        "sentMs": 327.9270270000052,
+        "receivedMs": 332.2917970000053,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "6",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 54,
+        "sentMs": 333.1767820000023,
+        "receivedMs": 340.7520250000016,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "5",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 55,
+        "sentMs": 345.5924190000005,
+        "receivedMs": 349.2877090000038,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "4",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 56,
+        "sentMs": 350.8569570000036,
+        "receivedMs": 356.35266100000445,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "3",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 57,
+        "sentMs": 358.07133500000054,
+        "receivedMs": 362.35027600000467,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "2",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 58,
+        "sentMs": 364.01756800000294,
+        "receivedMs": 367.77677000000403,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "1",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 59,
+        "sentMs": 368.5510340000037,
+        "receivedMs": 371.8660369999998,
+        "status": 200,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "0",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": null
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": true,
+          "deduplicated": "boolean",
+          "message": "absent",
+          "documentedMessageMatched": false,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 60,
+        "sentMs": 372.6324290000048,
+        "receivedMs": 375.57037400000263,
+        "status": 429,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "0",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": "60"
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": false,
+          "deduplicated": "absent",
+          "message": "string",
+          "documentedMessageMatched": true,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 61,
+        "sentMs": 376.37590199999977,
+        "receivedMs": 379.15628200000356,
+        "status": 429,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "0",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": "60"
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": false,
+          "deduplicated": "absent",
+          "message": "string",
+          "documentedMessageMatched": true,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 62,
+        "sentMs": 379.91098500000226,
+        "receivedMs": 382.66786900000443,
+        "status": 429,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "0",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": "60"
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": false,
+          "deduplicated": "absent",
+          "message": "string",
+          "documentedMessageMatched": true,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 63,
+        "sentMs": 383.3948070000042,
+        "receivedMs": 386.1226930000048,
+        "status": 429,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "0",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": "60"
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": false,
+          "deduplicated": "absent",
+          "message": "string",
+          "documentedMessageMatched": true,
+          "unexpectedFieldCount": 0
+        }
+      },
+      {
+        "index": 64,
+        "sentMs": 386.9540049999996,
+        "receivedMs": 389.61962499999936,
+        "status": 429,
+        "endpointMatched": true,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "ratelimit-limit": "60",
+          "ratelimit-remaining": "0",
+          "ratelimit-reset": "60",
+          "ratelimit-policy": "60;w=60",
+          "retry-after": "60"
+        },
+        "bodyShape": {
+          "jsonObject": true,
+          "ok": false,
+          "deduplicated": "absent",
+          "message": "string",
+          "documentedMessageMatched": true,
+          "unexpectedFieldCount": 0
+        }
+      }
+    ]
+  },
+  "negativeControls": [
+    {
+      "allowance": 59,
+      "target": "http://127.0.0.1:34749",
+      "startedAt": "2026-10-25T03:58:51.928Z",
+      "durationMs": 175.9444220000005,
+      "requests": [
+        {
+          "index": 0,
+          "sentMs": 0.001215000003867317,
+          "receivedMs": 10.990538999998535,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "59",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 1,
+          "sentMs": 13.808901999997033,
+          "receivedMs": 19.47473400000308,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "58",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 2,
+          "sentMs": 22.10940400000254,
+          "receivedMs": 24.708260999999766,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "57",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 3,
+          "sentMs": 27.738146000003326,
+          "receivedMs": 29.768475999997463,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "56",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 4,
+          "sentMs": 30.817880000002333,
+          "receivedMs": 32.87510699999984,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "55",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 5,
+          "sentMs": 33.6115839999984,
+          "receivedMs": 36.03260600000067,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "54",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 6,
+          "sentMs": 36.60264599999937,
+          "receivedMs": 38.015870000002906,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "53",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 7,
+          "sentMs": 38.60448600000382,
+          "receivedMs": 40.153744000002916,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "52",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 8,
+          "sentMs": 40.83477700000367,
+          "receivedMs": 42.34937499999796,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "51",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 9,
+          "sentMs": 43.193405999998504,
+          "receivedMs": 44.94231900000159,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "50",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 10,
+          "sentMs": 45.613210000003164,
+          "receivedMs": 47.32720800000243,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "49",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 11,
+          "sentMs": 48.088919000001624,
+          "receivedMs": 49.6813420000035,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "48",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 12,
+          "sentMs": 50.257706999997026,
+          "receivedMs": 51.98633500000142,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "47",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 13,
+          "sentMs": 52.58751299999858,
+          "receivedMs": 54.20847900000081,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "46",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 14,
+          "sentMs": 55.00119200000336,
+          "receivedMs": 56.87882600000012,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "45",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 15,
+          "sentMs": 57.740928999999596,
+          "receivedMs": 59.59924899999896,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "44",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 16,
+          "sentMs": 60.31441800000175,
+          "receivedMs": 62.16603500000201,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "43",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 17,
+          "sentMs": 63.087023000000045,
+          "receivedMs": 65.12138499999855,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "42",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 18,
+          "sentMs": 66.02163599999767,
+          "receivedMs": 68.13357299999916,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "41",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 19,
+          "sentMs": 68.94718100000318,
+          "receivedMs": 70.96152199999779,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "40",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 20,
+          "sentMs": 71.86673799999699,
+          "receivedMs": 73.57760099999723,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "39",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 21,
+          "sentMs": 75.17827599999873,
+          "receivedMs": 76.82374900000286,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "38",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 22,
+          "sentMs": 77.3326190000007,
+          "receivedMs": 79.03785400000197,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "37",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 23,
+          "sentMs": 79.73212000000058,
+          "receivedMs": 81.24374299999909,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "36",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 24,
+          "sentMs": 81.94391500000347,
+          "receivedMs": 83.47067100000277,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "35",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 25,
+          "sentMs": 84.15218099999765,
+          "receivedMs": 85.70990400000301,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "34",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 26,
+          "sentMs": 86.23569700000371,
+          "receivedMs": 88.00492200000008,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "33",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 27,
+          "sentMs": 88.57007200000226,
+          "receivedMs": 90.1099699999977,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "32",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 28,
+          "sentMs": 90.85965700000088,
+          "receivedMs": 92.35157900000195,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "31",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 29,
+          "sentMs": 93.14900900000066,
+          "receivedMs": 94.61150900000212,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "30",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 30,
+          "sentMs": 95.19766299999901,
+          "receivedMs": 96.84582200000295,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "29",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 31,
+          "sentMs": 97.34981600000174,
+          "receivedMs": 99.15559699999721,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "28",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 32,
+          "sentMs": 99.85522199999832,
+          "receivedMs": 101.29219600000215,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "27",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 33,
+          "sentMs": 102.06716199999937,
+          "receivedMs": 103.81514900000184,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "26",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 34,
+          "sentMs": 104.60063000000082,
+          "receivedMs": 106.07464199999959,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "25",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 35,
+          "sentMs": 106.73067699999956,
+          "receivedMs": 110.37106199999835,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "24",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 36,
+          "sentMs": 111.98867500000051,
+          "receivedMs": 113.60542200000054,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "23",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 37,
+          "sentMs": 114.2608309999996,
+          "receivedMs": 115.90778400000272,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "22",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 38,
+          "sentMs": 116.38593299999775,
+          "receivedMs": 118.07180399999925,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "21",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 39,
+          "sentMs": 118.73796700000094,
+          "receivedMs": 120.29882699999871,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "20",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 40,
+          "sentMs": 121.04844800000137,
+          "receivedMs": 122.44258999999875,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "19",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 41,
+          "sentMs": 123.1778720000002,
+          "receivedMs": 124.7228230000037,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "18",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 42,
+          "sentMs": 125.29463499999838,
+          "receivedMs": 126.98489700000209,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "17",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 43,
+          "sentMs": 127.56765399999858,
+          "receivedMs": 129.07994899999903,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "16",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 44,
+          "sentMs": 129.738989999998,
+          "receivedMs": 131.28669800000353,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "15",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 45,
+          "sentMs": 132.05051300000196,
+          "receivedMs": 133.53661399999692,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "14",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 46,
+          "sentMs": 134.1972089999981,
+          "receivedMs": 135.81193599999824,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "13",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 47,
+          "sentMs": 136.34584500000346,
+          "receivedMs": 137.99736400000256,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "12",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 48,
+          "sentMs": 138.6023950000017,
+          "receivedMs": 140.1424330000009,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "11",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 49,
+          "sentMs": 140.81917100000283,
+          "receivedMs": 142.23782100000244,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "10",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 50,
+          "sentMs": 143.03767199999857,
+          "receivedMs": 144.43475700000272,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "9",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 51,
+          "sentMs": 145.76399200000014,
+          "receivedMs": 147.33211999999912,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "8",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 52,
+          "sentMs": 148.0187950000036,
+          "receivedMs": 149.4192649999968,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "7",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 53,
+          "sentMs": 149.89460900000267,
+          "receivedMs": 151.32118300000002,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "6",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 54,
+          "sentMs": 151.99219900000026,
+          "receivedMs": 153.43251500000042,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "5",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 55,
+          "sentMs": 154.08519499999966,
+          "receivedMs": 155.49244200000248,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "4",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 56,
+          "sentMs": 156.16390200000023,
+          "receivedMs": 157.60840299999836,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "3",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 57,
+          "sentMs": 158.1500240000023,
+          "receivedMs": 159.6091729999971,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "2",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 58,
+          "sentMs": 160.1631239999988,
+          "receivedMs": 161.72018099999696,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "1",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": true,
+            "deduplicated": "absent",
+            "message": "absent",
+            "documentedMessageMatched": false,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 59,
+          "sentMs": 162.20324799999798,
+          "receivedMs": 163.85001799999736,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 60,
+          "sentMs": 164.3239689999973,
+          "receivedMs": 166.04041300000245,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 61,
+          "sentMs": 166.71457000000373,
+          "receivedMs": 168.22411999999895,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 62,
+          "sentMs": 168.98508199999924,
+          "receivedMs": 170.88570199999958,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 63,
+          "sentMs": 171.38474100000167,
+          "receivedMs": 173.05992200000037,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 64,
+          "sentMs": 173.7564459999994,
+          "receivedMs": 175.25593700000172,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        }
+      ],
+      "assertionRejected": true
+    },
+    {
+      "allowance": 0,
+      "target": "http://127.0.0.1:36573",
+      "startedAt": "2026-10-25T03:58:52.107Z",
+      "durationMs": 148.33663700000034,
+      "requests": [
+        {
+          "index": 0,
+          "sentMs": 0.0012560000031953678,
+          "receivedMs": 2.5384239999984857,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "59",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 1,
+          "sentMs": 3.3236239999969257,
+          "receivedMs": 5.7990609999978915,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "58",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 2,
+          "sentMs": 6.426878999998735,
+          "receivedMs": 8.19633800000156,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "57",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 3,
+          "sentMs": 8.730633999999554,
+          "receivedMs": 10.325314000001526,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "56",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 4,
+          "sentMs": 10.928632000002835,
+          "receivedMs": 12.485376999997243,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "55",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 5,
+          "sentMs": 13.177220999998099,
+          "receivedMs": 14.533366000003298,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "54",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 6,
+          "sentMs": 15.305739000003086,
+          "receivedMs": 16.623830999997153,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "53",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 7,
+          "sentMs": 17.37309500000265,
+          "receivedMs": 18.725972000000183,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "52",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 8,
+          "sentMs": 19.46936299999652,
+          "receivedMs": 20.907099000003655,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "51",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 9,
+          "sentMs": 21.4512590000013,
+          "receivedMs": 22.8888700000025,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "50",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 10,
+          "sentMs": 23.552286999998614,
+          "receivedMs": 25.244751999998698,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "49",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 11,
+          "sentMs": 25.806597000002512,
+          "receivedMs": 27.383225999998103,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "48",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 12,
+          "sentMs": 29.76709899999696,
+          "receivedMs": 31.472952999996778,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "47",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 13,
+          "sentMs": 32.133113000003505,
+          "receivedMs": 33.50540000000183,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "46",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 14,
+          "sentMs": 34.21201699999801,
+          "receivedMs": 35.673692999997,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "45",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 15,
+          "sentMs": 36.30301899999904,
+          "receivedMs": 37.5934699999998,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "44",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 16,
+          "sentMs": 38.38445900000079,
+          "receivedMs": 39.88911899999948,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "43",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 17,
+          "sentMs": 41.27469700000074,
+          "receivedMs": 42.67605200000253,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "42",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 18,
+          "sentMs": 43.458119000002625,
+          "receivedMs": 44.90176000000065,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "41",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 19,
+          "sentMs": 45.47020000000339,
+          "receivedMs": 46.90727699999843,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "40",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 20,
+          "sentMs": 47.52588300000207,
+          "receivedMs": 49.075934000000416,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "39",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 21,
+          "sentMs": 49.62092899999698,
+          "receivedMs": 51.29707200000121,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "38",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 22,
+          "sentMs": 51.99303499999951,
+          "receivedMs": 53.47394599999825,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "37",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 23,
+          "sentMs": 54.172608000000764,
+          "receivedMs": 55.74086399999942,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "36",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 24,
+          "sentMs": 56.44307000000117,
+          "receivedMs": 57.94167600000219,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "35",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 25,
+          "sentMs": 58.53507900000113,
+          "receivedMs": 60.1242179999972,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "34",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 26,
+          "sentMs": 60.645542999998725,
+          "receivedMs": 62.31328999999823,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "33",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 27,
+          "sentMs": 62.944931999998516,
+          "receivedMs": 64.45308800000203,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "32",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 28,
+          "sentMs": 65.12297799999942,
+          "receivedMs": 66.49194100000022,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "31",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 29,
+          "sentMs": 67.3653209999975,
+          "receivedMs": 68.79709300000104,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "30",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 30,
+          "sentMs": 69.49444000000221,
+          "receivedMs": 70.94427900000301,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "29",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 31,
+          "sentMs": 71.625420999997,
+          "receivedMs": 73.18026999999711,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "28",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 32,
+          "sentMs": 73.65419799999654,
+          "receivedMs": 76.31400099999883,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "27",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 33,
+          "sentMs": 77.33685700000206,
+          "receivedMs": 78.79489099999773,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "26",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 34,
+          "sentMs": 79.38834599999973,
+          "receivedMs": 80.88273199999821,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "25",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 35,
+          "sentMs": 81.44540099999722,
+          "receivedMs": 82.97684399999707,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "24",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 36,
+          "sentMs": 83.57562699999835,
+          "receivedMs": 85.12876700000197,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "23",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 37,
+          "sentMs": 85.60998000000109,
+          "receivedMs": 87.24659200000315,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "22",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 38,
+          "sentMs": 87.71827800000028,
+          "receivedMs": 89.26359200000297,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "21",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 39,
+          "sentMs": 89.78494299999875,
+          "receivedMs": 91.363400000002,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "20",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 40,
+          "sentMs": 91.98001199999999,
+          "receivedMs": 93.48445899999933,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "19",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 41,
+          "sentMs": 94.14260600000125,
+          "receivedMs": 95.64736000000266,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "18",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 42,
+          "sentMs": 96.37107899999683,
+          "receivedMs": 97.80147600000055,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "17",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 43,
+          "sentMs": 98.39325400000234,
+          "receivedMs": 100.01975900000252,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "16",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 44,
+          "sentMs": 100.56213800000114,
+          "receivedMs": 102.05095900000015,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "15",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 45,
+          "sentMs": 102.62948299999698,
+          "receivedMs": 104.30720100000326,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "14",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 46,
+          "sentMs": 104.84345900000335,
+          "receivedMs": 106.33312000000296,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "13",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 47,
+          "sentMs": 106.9137269999992,
+          "receivedMs": 108.43895899999916,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "12",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 48,
+          "sentMs": 109.49205800000345,
+          "receivedMs": 111.86970100000326,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "11",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 49,
+          "sentMs": 112.43108599999687,
+          "receivedMs": 113.9143699999986,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "10",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 50,
+          "sentMs": 114.49169999999867,
+          "receivedMs": 115.99913899999956,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "9",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 51,
+          "sentMs": 116.52425200000289,
+          "receivedMs": 117.97753399999783,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "8",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 52,
+          "sentMs": 118.49669900000299,
+          "receivedMs": 119.96364599999652,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "7",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 53,
+          "sentMs": 120.48248600000079,
+          "receivedMs": 121.77788999999757,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "6",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 54,
+          "sentMs": 122.37724600000365,
+          "receivedMs": 123.80030599999736,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "5",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 55,
+          "sentMs": 124.4570309999981,
+          "receivedMs": 125.89934599999833,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "4",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 56,
+          "sentMs": 126.45820300000196,
+          "receivedMs": 129.7171739999976,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "3",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 57,
+          "sentMs": 130.43132999999943,
+          "receivedMs": 131.9686819999988,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "2",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 58,
+          "sentMs": 132.51405499999964,
+          "receivedMs": 134.2002799999973,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "1",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 59,
+          "sentMs": 134.76778300000296,
+          "receivedMs": 136.33549199999834,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 60,
+          "sentMs": 136.93212800000038,
+          "receivedMs": 138.40828399999737,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 61,
+          "sentMs": 139.16327499999898,
+          "receivedMs": 140.54308299999684,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 62,
+          "sentMs": 141.19343800000206,
+          "receivedMs": 142.52623599999788,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 63,
+          "sentMs": 143.30196299999807,
+          "receivedMs": 144.62668999999732,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        },
+        {
+          "index": 64,
+          "sentMs": 146.22547199999826,
+          "receivedMs": 147.63213499999983,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "jsonObject": true,
+            "ok": false,
+            "deduplicated": "absent",
+            "message": "string",
+            "documentedMessageMatched": true,
+            "unexpectedFieldCount": 0
+          }
+        }
+      ],
+      "assertionRejected": true
+    }
+  ],
+  "cleanup": "owned process group stopped",
+  "deliveryContext": {
+    "localTaskId": "e5723d04-c01b-47c4-8fcc-aa09dfb9e154",
+    "revision": 1,
+    "planHash": "b618ba5b9730009bca366e753a52b707eda233e5d612babe0dfec76d65b45bab",
+    "runId": "6d9d269f-9a52-4bc7-bd0d-f4debb34e73b",
+    "diagnosticOutcome": "SUCCEEDED",
+    "sourceHead": "f6337433f00c5d634484875c11293028d4eabdaa",
+    "sourceFingerprint": "f20cf52a3ac5434edb9fb1b14602056b2eac2aebeda75bd883b2a740218d75ec"
+  }
+}
