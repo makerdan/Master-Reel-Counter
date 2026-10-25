@@ -1888,6 +1888,33 @@ describe("patchEntrySchema — Zod body guard", () => {
   });
 });
 
+describe("Zod 4 schema compatibility", () => {
+  test("Drizzle entry validation preserves null footage/text and string conductors", async () => {
+    const { insertEntrySchema } = await import("../../shared/schema");
+    const input = {
+      sessionId: 1, userId: "zod-compat-fixture", aisle: "B", section: "007",
+      footage: null, notes: null, conductors: "3/C",
+    };
+    const result = insertEntrySchema.safeParse(input);
+    assert.equal(result.success, true);
+    if (!result.success) return;
+    assert.deepEqual(result.data, input);
+    assert.equal(insertEntrySchema.safeParse({ ...input, footage: "100" }).success, false,
+      "numeric strings must not silently bypass the existing numeric contract");
+  });
+
+  test("entry patches preserve nulls, ordinary numbers and structured issues", () => {
+    const input = { footage: null, notes: null, color: null, conductors: null, reelCount: 2 };
+    assert.deepEqual(patchEntrySchema.parse(input), input);
+    const invalid = patchEntrySchema.safeParse({ footage: "not a number" });
+    assert.equal(invalid.success, false);
+    if (invalid.success) return;
+    assert.ok(Array.isArray(invalid.error.issues));
+    assert.deepEqual(invalid.error.issues[0].path, ["footage"]);
+    assert.equal(typeof invalid.error.issues[0].message, "string");
+  });
+});
+
 describe("body guard — safeParse-first pattern (regression guard)", () => {
   test("schema guards prevent 500 from undefined destructuring", () => {
     const rawBody = undefined;

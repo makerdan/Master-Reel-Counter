@@ -8,6 +8,57 @@ import { runOwnedProcessGroup } from "../lib/owned-process-group.mjs";
 
 const require = createRequire(import.meta.url);
 const root = new URL("../../", import.meta.url);
+// GHSA-mrhx-c7xc-m3w5: minimum patched Zod is 4.6.6, including all consumers.
+test("Zod root and sandbox locks retain the patched collection validator", () => {
+  for (const directory of ["", "artifacts/mockup-sandbox/"]) {
+    const lock = JSON.parse(readFileSync(new URL(directory + "package-lock.json", root)));
+    const versions = Object.entries(lock.packages)
+      .filter(([path]) => /(?:^|\/)node_modules\/zod$/.test(path))
+      .map(([, value]) => value.version);
+    assert.ok(versions.length > 0, directory);
+    for (const version of versions) {
+      const [major, minor, patch] = version.split(".").map(Number);
+      assert.ok(major === 4 && (minor > 6 || minor === 6 && patch >= 6), version);
+    }
+  }
+});
+
+test("installed Zod safely rejects oversized collections in bounded children", () => {
+  for (const directory of ["", "artifacts/mockup-sandbox/"]) {
+    if (!existsSync(new URL(directory + "node_modules/zod", root))) {
+      assert.notEqual(directory, "", "root Zod must be installed");
+      continue; // The sandbox lock guard above is unconditional.
+    }
+    const result = spawnSync(process.execPath, ["--max-old-space-size=128", "--import", "tsx/esm", "-e", `
+      const assert = require('node:assert/strict');
+      const { z } = require('zod');
+      const version = require('zod/package.json').version;
+      const [major, minor, patch] = version.split('.').map(Number);
+      assert.ok(major === 4 && (minor > 6 || minor === 6 && patch >= 6), version);
+      // Check collection size before expanding per-element failures, using
+      // public schemas rather than an internal/untyped parse-context option.
+      const schema = z.array(z.unknown()).max(8).pipe(z.array(z.object({ value: z.string() })));
+      const result = schema.safeParse(Array(250000).fill({ value: false }));
+      assert.equal(result.success, false);
+      assert.ok(result.error.issues.length <= 32, 'oversized inputs must not expand every element into issues');
+      assert.deepEqual(schema.parse([{ value: 'ordinary valid input' }]), [{ value: 'ordinary valid input' }]);
+      ${directory === "" ? `
+      (async () => {
+        const { validateVisionLabels } = await import('./server/providers/poe.ts');
+        assert.throws(() => validateVisionLabels(JSON.stringify({ labels: Array(250000).fill({ invalid: true }) }), 1),
+          (error) => error.code === 'validation');
+        assert.deepEqual(validateVisionLabels('{"labels":["A",null]}', 2), ['A', '']);
+        process.stdout.write('zod-resource-guard:ok');
+      })().catch((error) => { console.error(error); process.exitCode = 1; });
+      ` : "process.stdout.write('zod-resource-guard:ok');"}
+    `], { cwd: new URL(directory || "./", root), timeout: 8000,
+      encoding: "utf8", maxBuffer: 64 * 1024 });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.status, 0, `${directory}: ${result.stderr}`);
+    assert.equal(result.signal, null);
+    assert.match(result.stdout, /zod-resource-guard:ok/, "child must actually execute its assertions");
+  }
+});
 const from = (consumer, dependency) =>
   createRequire(consumer.resolve(dependency));
 const excel = from(require, "exceljs");

@@ -248,6 +248,13 @@ export function validateVisionLabels(content: string, expectedCount: number): st
   } catch {
     throw new PoeProviderError("validation", "Poe returned invalid structured output.", 502);
   }
+  // Enforce the existing exact-count contract before allocating per-label
+  // validation issues. Do not rely on Zod's internal early-abort parse option.
+  const labels = parsed && typeof parsed === "object"
+    ? (parsed as { labels?: unknown }).labels : undefined;
+  if (!Array.isArray(labels) || labels.length !== expectedCount) {
+    throw new PoeProviderError("validation", "Poe returned invalid structured output.", 502);
+  }
   const result = visionLabelsSchema.safeParse(parsed);
   if (!result.success || result.data.labels.length !== expectedCount) {
     throw new PoeProviderError("validation", "Poe returned invalid structured output.", 502);

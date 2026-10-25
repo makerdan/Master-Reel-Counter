@@ -1238,7 +1238,7 @@ export async function registerRoutes(
     try {
       const parsed = patchSessionSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.issues });
       }
       const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
@@ -3451,7 +3451,7 @@ export async function registerRoutes(
   });
 
   const updateCollaboratorRoleBody = z.object({
-    role: z.enum(["editor", "viewer"], { errorMap: () => ({ message: "Role must be editor or viewer" }) }),
+    role: z.enum(["editor", "viewer"], { error: "Role must be editor or viewer" }),
   });
 
   app.patch("/api/sessions/:id/collaborators/:collabId", isAuthenticated, async (req: any, res) => {

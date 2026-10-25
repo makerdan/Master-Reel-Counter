@@ -16,3 +16,17 @@ claim that all nested npm overrides are broken.
 **How to apply:** Prefer the narrowest effective consumer constraint, inspect the
 real resolution chain after installation, and keep consumer-relative recurrence
 checks. Do not compensate with a broad incompatible override or an audit waiver.
+
+## Portable lockfile sources after managed installation
+
+Inspect newly resolved lockfile URLs after using the managed root package
+installer or the sandbox's documented package procedure. Preserve versions and
+integrities, but use the matching public npm tarball URLs for registry packages.
+
+**Why:** Both procedures have emitted workspace-internal HTTP package-firewall
+URLs. Installation succeeded locally, but existing portability guards correctly
+rejected these sources because clean external CI cannot rely on that host.
+
+**How to apply:** Keep the existing unconditional root/sandbox portability guards,
+normalize only affected registry URLs, and rerun those guards. Never suppress
+the portability check or treat a local successful install as portable evidence.

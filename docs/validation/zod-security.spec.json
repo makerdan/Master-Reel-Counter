@@ -1,0 +1,37 @@
+{
+  "claim": "native-1007-owner-authorized-main-zod-handoff",
+  "title": "Prevent oversized validation inputs from exhausting memory",
+  "scope": "Execute native 1007's approved Zod advisory repair in main following the owner's explicit direction that its previous executor remains idle. Upgrade root and sandbox Zod to an upstream-patched version and only necessary compatible Drizzle/form/error adapters. Preserve nullable fields, defaults, numeric coercion, string conductors, malformed-input HTTP 400 responses and form/API behavior. Implement bounded memory/time regression tests, installed and locked consumer checks and compatibility assertions. No production data, deployment, audit waiver, unrelated dependency upgrade or duplicate native task. Accessible main records contain no prior Zod admission; inaccessible isolated records must not be copied, erased or claimed reconciled. Prior mobile photo work remains under its separate existing plan.",
+  "tier": "test-heavy",
+  "why": "The registered heavy tier includes the required audit, compiler, unit/API guards and browser compatibility checks; lower tiers omit audit/browser coverage.",
+  "coverage": "docs/validation/manifest.json test-heavy, 900000ms, including security-audit, typecheck, unit-tests and browser-tests through scripts/run-browser-tests.mjs. Preserve actual registered steps and available browser matrix. Supported guarded diagnostics inform repair but do not establish full-tier or skipped WebKit coverage.",
+  "approval": {
+    "reference": "Current owner request to fix body-parser/Zod advisories and explicit affirmative response to the Zod executor-idleness handoff question",
+    "direction": "Keep native 1007's previous executor idle and repair Zod here.",
+    "applicability": "Same approved native 1007 security scope, necessary major-version compatibility work and regression tests in this main checkout. No native approval authentication or automatic propagation claimed."
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {
+      "requirement": "R1 patched installed and locked root/sandbox Zod consumers",
+      "check": "Assert actual root/sandbox Zod resolutions and lockfile entries are at least upstream-patched 4.6.6. Verify Drizzle/form/error adapters consume a compatible major without broad incompatible overrides or audit suppression."
+    },
+    {
+      "requirement": "R2 bounded oversized collection rejection",
+      "check": "In heap- and time-bounded disposable Node children for both roots, parse an oversized constrained collection, require deterministic safe rejection without per-item issue explosion, then accept an ordinary valid collection."
+    },
+    {
+      "requirement": "R3 API/schema/form compatibility",
+      "check": "Preserve null text/footage, valid numeric fields and string conductors through shared-schema assertions and existing real-route body-guard tests. Keep structured malformed-input 400 errors. Typecheck/build and browser coverage must detect adapter/form breakage."
+    }
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Security, resource-exhaustion and compatibility repair changes the schema-validation major across existing API and form boundaries.",
+    "covers": "R1 vulnerable dependency recurrence; R2 oversized constrained-collection memory exhaustion; R3 existing null/default/coercion/error/form behavior",
+    "testLocation": "scripts/__tests__/dependency-tooling-security.test.mjs and server/__tests__/routes.test.ts",
+    "assertion": "Check actual installed/locked root and sandbox Zod versions, finite successful memory-limited child execution rejecting oversized collections, ordinary valid collections and exact shared-schema/null/string/error behavior; retain real-route malformed-body guards and compiler/browser checks."
+  }
+}
